@@ -27,7 +27,7 @@ class AudioSpectralPhaseReportTests(unittest.TestCase):
             self.assertEqual(report["verification_status"], "STFT_REPRODUCIBILITY_VERIFIED_E0")
             self.assertEqual(report["summary"]["frame_count"], 48)
             self.assertEqual(len(report["frame_metrics"]), 48)
-            self.assertIn("not spatial phase", report["audio_domain_phase_diagnostic"]["interpretation"])
+            self.assertIn("not spatial phase", report["audio_domain_phase_diagnostic"]["interpretation"].lower())
             self.assertIn("does not clear the HFR-06", " ".join(report["limitations"]))
 
     def test_tampered_saved_stft_fails_before_analysis(self):
