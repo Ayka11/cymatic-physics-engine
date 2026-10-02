@@ -1,6 +1,6 @@
 # CPE HFR-02 Diagnostic Visualization — E0
 
-This artifact documents the diagnostic visualization stage for the alternate Russian «мама» recording processed in E0.
+This artifact documents diagnostic visualization and reproducibility checks for the alternate Russian «мама» recording processed in E0.
 
 ## Status
 
@@ -21,7 +21,6 @@ Source processing status:
 - Time frames: 48
 - Array shape: `(8193, 48)` for both real and imaginary parts
 - Complex phase preserved: yes
-- Numerical finiteness: verified
 
 ## Diagnostic plots
 
@@ -43,22 +42,31 @@ python -m pip install numpy scipy
 python cpe_hfr02/diagnostics/verify_stft_reproducibility.py --input "C:\path\to\CPE_HFR02_RussianMama_Run" --out "C:\path\to\stft_verification_report.json"
 ```
 
-The verifier checks the source and WAV hashes against provenance, requires the recorded E0 status and expected STFT settings, recomputes the complex STFT from the canonical PCM16 WAV, and compares frequency axes, time axes, matrix shape, real and imaginary values, and complex error under explicit numerical tolerances. A mismatch exits with an error rather than producing a verified status.
+The verifier checks source and WAV hashes against provenance, requires the recorded E0 status and expected STFT settings, recomputes the complex STFT from the canonical PCM16 WAV, and compares frequency axes, time axes, matrix shape, real and imaginary values, and complex error under explicit numerical tolerances. A mismatch exits with an error rather than producing a verified status.
 
-A successful report uses status `STFT_REPRODUCIBILITY_VERIFIED_E0`. This status means only that the stored audio-domain STFT is numerically reproducible from the WAV under the specified settings. It does not establish spatial cymatic structure or a physical effect.
+A successful report uses status `STFT_REPRODUCIBILITY_VERIFIED_E0`. This means only that the stored audio-domain STFT is numerically reproducible from the WAV under the specified settings. It does not establish spatial cymatic structure or a physical effect.
+
+## UTF-8 provenance metadata repair
+
+The current local provenance output displayed `source_word` as mojibake (`РјР°РјР°`) instead of `мама`. This is a metadata text-encoding issue; it does not change the audio bytes or their SHA-256 values.
+
+Preview the narrowly scoped repair first:
+
+```powershell
+python cpe_hfr02/diagnostics/repair_provenance_encoding.py --provenance "C:\path\to\CPE_HFR02_RussianMama_Run\provenance.json"
+```
+
+Only if the preview reports the expected correction, apply it:
+
+```powershell
+python cpe_hfr02/diagnostics/repair_provenance_encoding.py --provenance "C:\path\to\CPE_HFR02_RussianMama_Run\provenance.json" --apply
+```
+
+The tool only corrects the exact known mojibake value for Russian-language E0 provenance, refuses unknown values or unexpected status, and changes no audio or STFT files. It atomically writes UTF-8 JSON and preserves both recorded source-hash fields.
 
 ## Quantitative metrics
 
-The diagnostic report includes:
-
-- RMS normalized PCM amplitude.
-- Peak absolute normalized PCM amplitude.
-- Crest factor (peak divided by RMS; null for an all-zero signal).
-- Count and fraction of samples at the signed PCM full-scale threshold.
-- Zero-crossing rate per sample.
-- Up to ten prominent local peaks from the mean STFT magnitude, expressed as frequency and relative dB.
-
-These are signal-description metrics only. Spectral peaks are not automatically interpreted as phonemes, resonant modes, or evidence of physical cymatic effects.
+The diagnostic report includes RMS normalized PCM amplitude, peak absolute normalized PCM amplitude, crest factor, clipping count/fraction, zero-crossing rate per sample, and up to ten prominent local peaks from mean STFT magnitude. These are descriptive signal features, not phoneme labels or evidence of physical resonance.
 
 ## Scientific scope and limitations
 
@@ -77,4 +85,4 @@ python -m pip install numpy matplotlib scipy
 python -m unittest discover -s cpe_hfr02/diagnostics/tests -v
 ```
 
-The GitHub Actions workflow `.github/workflows/cpe-hfr02-diagnostics.yml` runs these tests on relevant pushes and pull requests. Tests use generated fixtures and verify software behavior; they do not validate the external recording or any physical system.
+The GitHub Actions workflow runs these tests on relevant pushes and pull requests. Tests use generated fixtures and verify software behavior; they do not validate the external recording or any physical system.
