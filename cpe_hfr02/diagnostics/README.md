@@ -116,3 +116,18 @@ Interpretation cautions:
 - A peak or phase statistic that changes with the configuration should be reported as parameter-sensitive, not promoted as a physical resonance.
 - The tool first verifies the stored baseline STFT against provenance and the canonical WAV. That gate is a software/reproducibility check, not physical validation.
 - The alternate-source HFR-06 gate remains closed; physical cymatic claims require separately calibrated spatial measurements.
+
+
+## Frequency-resolved peak robustness report
+
+After the existing provenance and independent STFT reproducibility gate passes, track individual mean-spectrum candidate peaks across the six predeclared STFT configurations:
+
+\`\`\`powershell
+python cpe_hfr02/diagnostics/analyze_frequency_peak_robustness.py --input "C:\\path\\to\\CPE_HFR02_RussianMama_Run" --out "C:\\path\\to\\frequency_peak_robustness.json"
+\`\`\`
+
+The report tracks up to 12 baseline local maxima above −30 dB relative to the configuration's global mean-spectrum peak. Peaks are matched using a predeclared tolerance equal to half the sum of the baseline and candidate effective window-resolution scales (\`sample_rate / nperseg\`), not zero-padded FFT-bin spacing. It reports frequency, magnitude, relative magnitude, match tolerance, peak-to-peak drift, maximum baseline delta, and configuration coverage.
+
+Audio-domain residual phase concentration is reported separately per matched configuration with an explicit −40 dB support floor and minimum support requirements. Frequency drift and phase concentration are never combined into a composite score. The tool runs the existing source/WAV hash and complex-STFT verification first and fails closed on mismatch.
+
+This is audio-only robustness evidence. The report explicitly prohibits conclusions about physical resonance or spatial cymatic fields and preserves the HFR-06 alternate-source hash gate. A stable audio peak is not evidence of a physical resonance.

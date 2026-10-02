@@ -1,0 +1,80 @@
+name: CPE v7.15 release validation and staging
+
+on:
+  push:
+    branches: [full-app-v7.15]
+    paths-ignore: ["**.md"]
+  pull_request:
+    branches: [full-app-v7.15]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cpe-v715-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Full application validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Check out release branch with LFS objects
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install declared application dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --prefer-binary -r requirements.txt
+      - name: Compile Python sources
+        run: python -m compileall -q app cymatic_engine cpe_hfr02 tests
+      - name: Run full application test suite
+        run: python -m unittest discover -s tests -v
+      - name: Run HFR-02 diagnostic test suite
+        run: python -m unittest discover -s cpe_hfr02/diagnostics/tests -v
+      - name: Construct Gradio app smoke test
+        run: |
+          python - <<'PY'
+          import app
+          assert app.demo is not None, "Gradio demo was not constructed"
+          assert hasattr(app.demo, "launch"), "Gradio demo has no launch method"
+          print("CPE v7.15 app construction PASS")
+          PY
+
+  deploy-staging:
+    name: Optional deploy to isolated Hugging Face staging Space
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/full-app-v7.15'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out release branch with LFS objects
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: Push to staging Space only when staging secrets exist
+        if: env.HF_TOKEN != '' && env.HF_STAGING_SPACE != ''
+        env:
+          HF_TOKEN: \${{ secrets.HF_TOKEN }}
+          HF_STAGING_SPACE: \${{ vars.HF_STAGING_SPACE }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git lfs install
+          git remote add hf-staging "https://user:\${HF_TOKEN}@huggingface.co/spaces/\${HF_STAGING_SPACE}"
+          git push hf-staging "HEAD:refs/heads/main"
+      - name: Explain skipped staging deployment
+        if: env.HF_TOKEN == '' || env.HF_STAGING_SPACE == ''
+        env:
+          HF_TOKEN: \${{ secrets.HF_TOKEN }}
+          HF_STAGING_SPACE: \${{ vars.HF_STAGING_SPACE }}
+        run: echo "Staging deploy skipped safely; configure HF_TOKEN secret and HF_STAGING_SPACE variable for a separate staging Space."
