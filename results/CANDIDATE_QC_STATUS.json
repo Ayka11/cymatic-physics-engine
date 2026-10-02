@@ -1,0 +1,16 @@
+{
+  "release": "CPE_E2_MASTER_v7.05",
+  "status": "IMPLEMENTED",
+  "stage": "Candidate QC / Selection",
+  "upstream_required": "v7.04 PASS",
+  "upstream_current_status": "IMPLEMENTED",
+  "real_mms_fa_execution_available_in_package": false,
+  "selection_target": 680,
+  "phones": 34,
+  "candidates_per_phone": 20,
+  "speaker_cap_per_phone": 4,
+  "fail_closed": true,
+  "forbidden_fallbacks": ["manual", "guessed", "synthetic", "repaired"],
+  "scientific_evidence_level_maximum": "E1",
+  "note": "Implementation and tests are complete; a real 680-candidate PASS requires actual MMS-FA alignment output from v7.04."
+}

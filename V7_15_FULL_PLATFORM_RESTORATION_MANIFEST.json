@@ -1,0 +1,17 @@
+{
+  "release": "CPE E2 v7.15 FULL PLATFORM RESTORATION",
+  "baseline": "CPE_E2_MASTER_v7_14_FULL_CURRENT.zip",
+  "strategy": "preserve original full experimental UI and engine; restore v7.14 scientific gates",
+  "scientific_claim_guard": "fail_closed",
+  "synthetic_or_manual_fallback": false,
+  "components": [
+    "full_experiment_ui",
+    "physics",
+    "calibration",
+    "analysis",
+    "measurement_protocol",
+    "v7.04-v7.14_scientific_pipeline",
+    "HFR09",
+    "zerogpu_launcher"
+  ]
+}

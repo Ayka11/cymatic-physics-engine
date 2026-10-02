@@ -1,0 +1,11 @@
+{
+  "schema": "CPE_PHONE_PROJECTION_v712",
+  "policy": "explicit_mapping_only_no_inference",
+  "canonical_phone_count": 34,
+  "reject_unknown_phones": true,
+  "reject_uncovered_character_spans": true,
+  "reject_overlapping_projected_intervals": true,
+  "require_mapping_source": true,
+  "require_source_alignment_provenance": true,
+  "allow_synthetic_fallback": false
+}

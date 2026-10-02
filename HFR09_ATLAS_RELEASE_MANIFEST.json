@@ -1,0 +1,17 @@
+{
+  "release": "CPE E2 HFR-09-REAL HF Atlas Update",
+  "base": "CPE_E2_MASTER_v7_14_SCIENTIFIC_VALIDATION",
+  "assets": {
+    "cymatic_atlas": "assets/hfr09/CPE_HFR09_AZ_CYMATIC_ATLAS.png",
+    "unique_glyphs": "assets/hfr09/CPE_HFR09_AZ_UNIQUE_GLYPHS.png"
+  },
+  "asset_sha256": {
+    "CPE_HFR09_AZ_CYMATIC_ATLAS.png": "1a728c9ef0baca12afe6b176559c4a14c31217a50ddcda41d4a799be67deefac",
+    "CPE_HFR09_AZ_UNIQUE_GLYPHS.png": "71241fc943b736ccdc2cd60f39ed04f963062f63719d59c12fe159e170b58db2"
+  },
+  "scientific_policy": "visual assets do not constitute empirical human-speech validation",
+  "fail_closed": true,
+  "integrated_into": "CPE_E2_MASTER_v7_14_SCIENTIFIC_VALIDATION",
+  "integration_status": "INTEGRATED",
+  "integration_note": "HFR-09-REAL atlas, unique glyphs, and acoustic calibration assets are part of the v7.14 master release package."
+}

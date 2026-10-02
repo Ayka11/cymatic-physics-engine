@@ -1,0 +1,9 @@
+{
+  "schema": "CPE_PHONE_PROJECTION_v712_STATUS",
+  "status": "IMPLEMENTED",
+  "runtime_ready": true,
+  "real_corpus_run": false,
+  "phone_mapping_policy": "explicit_mapping_only_no_inference",
+  "synthetic_fallback": false,
+  "scientific_status": "E1"
+}

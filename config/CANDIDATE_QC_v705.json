@@ -1,0 +1,22 @@
+{
+  "schema": "CPE_CANDIDATE_QC_v705",
+  "upstream_required_status": "PASS",
+  "fail_closed": true,
+  "canonical_phone_count": 34,
+  "candidates_per_phone": 20,
+  "target_size": 680,
+  "qc": {
+    "min_confidence": 0.60,
+    "min_duration_samples": 160,
+    "max_duration_samples": 16000,
+    "duplicate_source_observation": true,
+    "provenance_required": true,
+    "model_id": "MMS_FA"
+  },
+  "selection": {
+    "max_candidates_per_speaker_per_phone": 4,
+    "require_speaker_diversity": true,
+    "ranking": "confidence_desc,duration_asc,speaker_id,utterance_id,start_sample,alignment_hash"
+  },
+  "forbidden_fallbacks": ["manual", "guessed", "synthetic", "repaired"]
+}

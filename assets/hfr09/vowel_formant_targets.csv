@@ -1,0 +1,12 @@
+sound,type,F0_Hz,target_F1_Hz,target_F2_Hz,target_F3_Hz,source,approximate,file
+i,vowel,130.0,270,2290,3010,Peterson-Barney representative adult male calibration,False,vowel_i.wav
+ɪ,vowel,130.0,390,1990,2550,Peterson-Barney representative adult male calibration,False,vowel_ɪ.wav
+e,vowel,130.0,530,1840,2480,Peterson-Barney representative adult male calibration,False,vowel_e.wav
+ɛ,vowel,130.0,530,1840,2480,Peterson-Barney representative adult male calibration,False,vowel_ɛ.wav
+æ,vowel,130.0,660,1720,2410,Peterson-Barney representative adult male calibration,False,vowel_æ.wav
+ɑ,vowel,130.0,730,1090,2440,Peterson-Barney representative adult male calibration,False,vowel_ɑ.wav
+ɔ,vowel,130.0,570,840,2410,Peterson-Barney representative adult male calibration,False,vowel_ɔ.wav
+ʊ,vowel,130.0,440,1020,2240,Peterson-Barney representative adult male calibration,False,vowel_ʊ.wav
+u,vowel,130.0,300,870,2240,Peterson-Barney representative adult male calibration,False,vowel_u.wav
+ʌ,vowel,130.0,640,1190,2390,Peterson-Barney representative adult male calibration,False,vowel_ʌ.wav
+ə,vowel,130.0,500,1500,2500,Peterson-Barney representative adult male calibration,True,vowel_ə.wav
