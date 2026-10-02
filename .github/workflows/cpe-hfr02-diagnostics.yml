@@ -26,6 +26,6 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install test dependencies
-        run: python -m pip install --upgrade pip numpy matplotlib
+        run: python -m pip install --upgrade pip numpy matplotlib scipy
       - name: Run fail-closed diagnostic tests
         run: python -m unittest discover -s cpe_hfr02/diagnostics/tests -v
