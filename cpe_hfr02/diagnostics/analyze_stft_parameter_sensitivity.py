@@ -76,7 +76,7 @@ def analyze_sensitivity(input_dir: Path, min_frequency_hz: float = 50.0,
             concentrations = []
             for i in np.flatnonzero(eligible):
                 values = residual[i, pair_support[i]]
-                concentrations.append(float(np.abs(np.mean(np.exp(1j * values)))))
+                concentrations.append(min(1.0, float(np.abs(np.mean(np.exp(1j * values))))))
             threshold_rows.append({
                 "magnitude_floor_db_relative_to_global_peak": floor_db,
                 "eligible_frequency_bin_count": int(np.sum(eligible)),
