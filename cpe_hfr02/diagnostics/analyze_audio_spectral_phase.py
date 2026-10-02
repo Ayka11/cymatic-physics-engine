@@ -92,6 +92,26 @@ def analyze(input_dir: Path, min_frequency_hz: float = 50.0,
         reverse=True,
     )
 
+    # Report threshold sensitivity separately from the primary phase result.
+    # This makes a zero-eligible-bin outcome auditable without silently relaxing
+    # the configured threshold used for phase_rows.
+    phase_support_sensitivity = []
+    for floor_db in (-20.0, -30.0, -40.0, -50.0, -60.0):
+        floor = global_peak * (10.0 ** (floor_db / 20.0))
+        support = magnitude >= floor
+        fractions = np.mean(support, axis=1)
+        adjacent_pairs = support[:, 1:] & support[:, :-1]
+        frame_supported_count = int(np.sum(fractions >= 0.8))
+        pair_eligible_count = int(np.sum(
+            (fractions >= 0.8) & (np.sum(adjacent_pairs, axis=1) >= 2)
+        ))
+        phase_support_sensitivity.append({
+            "magnitude_floor_db_relative_to_global_peak": floor_db,
+            "frequency_bins_meeting_frame_support": frame_supported_count,
+            "frequency_bins_meeting_frame_and_pair_support": pair_eligible_count,
+            "maximum_supported_frame_fraction": float(np.max(fractions)),
+        })
+
     return {
         "status": "AUDIO_SPECTRAL_PHASE_REPORT_E0",
         "verification_status": verification["status"],
@@ -120,6 +140,12 @@ def analyze(input_dir: Path, min_frequency_hz: float = 50.0,
             "magnitude_floor_db_relative_to_global_peak": float(phase_floor_db),
             "minimum_supported_frame_fraction": 0.8,
             "eligible_frequency_bin_count": len(phase_rows),
+            "support_sensitivity": phase_support_sensitivity,
+            "support_sensitivity_note": (
+                "Counts show how eligibility changes at diagnostic magnitude floors. "
+                "The configured phase-floor-dB value alone determines the primary "
+                "highest_concentration_bins; sensitivity counts do not replace it."
+            ),
             "highest_concentration_bins": phase_rows[:20],
             "interpretation": (
                 "Descriptive phase-increment consistency of the audio STFT after removing "
