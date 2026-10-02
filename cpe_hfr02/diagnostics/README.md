@@ -98,3 +98,21 @@ python -m unittest discover -s cpe_hfr02/diagnostics/tests -v
 ```
 
 The GitHub Actions workflow runs these tests on relevant pushes and pull requests. Tests use generated fixtures and verify software behavior; they do not validate the external recording or any physical system.
+
+
+## STFT parameter sensitivity
+
+Run the parameter-sensitivity report after the baseline provenance/reproducibility gate passes:
+
+```powershell
+python cpe_hfr02/diagnostics/analyze_stft_parameter_sensitivity.py --input "C:\\path\\to\\CPE_HFR02_RussianMama_Run" --out "C:\\path\\to\\stft_parameter_sensitivity.json"
+```
+
+The report recomputes the audio STFT from the same canonical WAV across six predeclared configurations (window lengths 2048, 4096, and 8192 samples, with two hop sizes per length). It records frame count, frequency-grid spacing, mean-spectrum peak frequency, mean frame spectral centroid, and phase-support summaries at −40 and −60 dB. The 4096/1024/16384 configuration is included as the baseline for comparison.
+
+Interpretation cautions:
+- Frequency-grid spacing and frame support change with configuration; values from different configurations are not interchangeable measurements.
+- Zero-padding makes the sampled frequency grid denser but does not add physical information.
+- A peak or phase statistic that changes with the configuration should be reported as parameter-sensitive, not promoted as a physical resonance.
+- The tool first verifies the stored baseline STFT against provenance and the canonical WAV. That gate is a software/reproducibility check, not physical validation.
+- The alternate-source HFR-06 gate remains closed; physical cymatic claims require separately calibrated spatial measurements.
