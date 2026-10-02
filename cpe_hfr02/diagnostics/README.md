@@ -105,7 +105,7 @@ The GitHub Actions workflow runs these tests on relevant pushes and pull request
 Run the parameter-sensitivity report after the baseline provenance/reproducibility gate passes:
 
 ```powershell
-python cpe_hfr02/diagnostics/analyze_stft_parameter_sensitivity.py --input "C:\\path\\to\\CPE_HFR02_RussianMama_Run" --out "C:\\path\\to\\stft_parameter_sensitivity.json"
+python cpe_hfr02/diagnostics/analyze_stft_parameter_sensitivity.py --input "C:\path\to\CPE_HFR02_RussianMama_Run" --out "C:\path\to\stft_parameter_sensitivity.json"
 ```
 
 The report recomputes the audio STFT from the same canonical WAV across six predeclared configurations (window lengths 2048, 4096, and 8192 samples, with two hop sizes per length). It records frame count, frequency-grid spacing, mean-spectrum peak frequency, mean frame spectral centroid, and phase-support summaries at −40 and −60 dB. The 4096/1024/16384 configuration is included as the baseline for comparison.
@@ -123,7 +123,7 @@ Interpretation cautions:
 After the existing provenance and independent STFT reproducibility gate passes, track individual mean-spectrum candidate peaks across the six predeclared STFT configurations:
 
 \`\`\`powershell
-python cpe_hfr02/diagnostics/analyze_frequency_peak_robustness.py --input "C:\\path\\to\\CPE_HFR02_RussianMama_Run" --out "C:\\path\\to\\frequency_peak_robustness.json"
+python cpe_hfr02/diagnostics/analyze_frequency_peak_robustness.py --input "C:\path\to\CPE_HFR02_RussianMama_Run" --out "C:\path\to\frequency_peak_robustness.json"
 \`\`\`
 
 The report tracks up to 12 baseline local maxima above −30 dB relative to the configuration's global mean-spectrum peak. Peaks are matched using a predeclared tolerance equal to half the sum of the baseline and candidate effective window-resolution scales (\`sample_rate / nperseg\`), not zero-padded FFT-bin spacing. It reports frequency, magnitude, relative magnitude, match tolerance, peak-to-peak drift, maximum baseline delta, and configuration coverage.
