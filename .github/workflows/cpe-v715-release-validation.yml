@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: cpe-v715-\${{ github.ref }}
+  group: cpe-v715-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -62,19 +62,20 @@ jobs:
         with:
           lfs: true
       - name: Push to staging Space only when staging secrets exist
-        if: env.HF_TOKEN != '' && env.HF_STAGING_SPACE != ''
         env:
-          HF_TOKEN: \${{ secrets.HF_TOKEN }}
-          HF_STAGING_SPACE: \${{ vars.HF_STAGING_SPACE }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_STAGING_SPACE: ${{ vars.HF_STAGING_SPACE }}
         shell: bash
         run: |
           set -euo pipefail
+          if [[ -z "${HF_TOKEN}" || -z "${HF_STAGING_SPACE}" ]]; then
+            echo "Staging deploy skipped: configure HF_TOKEN and HF_STAGING_SPACE."
+            exit 0
+          fi
+          if [[ "${HF_STAGING_SPACE}" == "Aygun1489/cymatic-physics-engine" ]]; then
+            echo "Refusing to deploy this workflow to the production Space."
+            exit 1
+          fi
           git lfs install
-          git remote add hf-staging "https://user:\${HF_TOKEN}@huggingface.co/spaces/\${HF_STAGING_SPACE}"
+          git remote add hf-staging "https://user:${HF_TOKEN}@huggingface.co/spaces/${HF_STAGING_SPACE}"
           git push hf-staging "HEAD:refs/heads/main"
-      - name: Explain skipped staging deployment
-        if: env.HF_TOKEN == '' || env.HF_STAGING_SPACE == ''
-        env:
-          HF_TOKEN: \${{ secrets.HF_TOKEN }}
-          HF_STAGING_SPACE: \${{ vars.HF_STAGING_SPACE }}
-        run: echo "Staging deploy skipped safely; configure HF_TOKEN secret and HF_STAGING_SPACE variable for a separate staging Space."
