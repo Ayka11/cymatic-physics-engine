@@ -22,7 +22,6 @@ Source processing status:
 - Array shape: `(8193, 48)` for both real and imaginary parts
 - Complex phase preserved: yes
 - Numerical finiteness: verified
-- Nonzero imaginary component: verified
 
 ## Diagnostic plots
 
@@ -33,25 +32,24 @@ The visualization utility generates:
 3. `03_stft_phase.png` — complex STFT phase with low-magnitude bins masked.
 4. `diagnostic_report.json` — provenance-linked hashes and plot metadata.
 
-The utility validates the source and WAV hashes and the expected complex-array structure before generating plots.
+The generator validates source and WAV hashes, PCM format, and complex-array structure before generating plots. It produces descriptive audio metrics, not physical validation.
 
-## Scientific scope
+## Independent STFT reproducibility verification
 
-These figures are audio-domain diagnostics. They are not measurements of a spatial cymatic plate field.
+Install the dependencies and run the independent verifier against an existing run directory:
 
-Relative STFT magnitude is not calibrated sound-pressure level. STFT phase is audio-domain phase, not a spatial plate-field phase map.
+```powershell
+python -m pip install numpy scipy
+python cpe_hfr02/diagnostics/verify_stft_reproducibility.py --input "C:\path\to\CPE_HFR02_RussianMama_Run" --out "C:\path\to\stft_verification_report.json"
+```
 
-This stage does not establish acoustic-pressure calibration, acoustic-to-force transfer calibration, plate response, or particle/contact validation.
+The verifier checks the source and WAV hashes against provenance, requires the recorded E0 status and expected STFT settings, recomputes the complex STFT from the canonical PCM16 WAV, and compares frequency axes, time axes, matrix shape, real and imaginary values, and complex error under explicit numerical tolerances. A mismatch exits with an error rather than producing a verified status.
 
-The alternate recording does not clear the separate HFR-06 canonical source-hash gate.
+A successful report uses status `STFT_REPRODUCIBILITY_VERIFIED_E0`. This status means only that the stored audio-domain STFT is numerically reproducible from the WAV under the specified settings. It does not establish spatial cymatic structure or a physical effect.
 
-## Local generation
+## Quantitative metrics
 
-Use the accompanying `generate_diagnostics.py` script with the existing CPE HFR-02 Russian Mama run directory.
-
-## Quantitative metrics added in the current utility
-
-The JSON report now includes the following descriptive signal metrics:
+The diagnostic report includes:
 
 - RMS normalized PCM amplitude.
 - Peak absolute normalized PCM amplitude.
@@ -60,17 +58,23 @@ The JSON report now includes the following descriptive signal metrics:
 - Zero-crossing rate per sample.
 - Up to ten prominent local peaks from the mean STFT magnitude, expressed as frequency and relative dB.
 
-These are signal-description metrics only. The listed spectral peaks are not automatically interpreted as phonemes, resonant modes, or evidence of physical cymatic effects.
+These are signal-description metrics only. Spectral peaks are not automatically interpreted as phonemes, resonant modes, or evidence of physical cymatic effects.
 
-## Validation and tests
+## Scientific scope and limitations
+
+- Audio STFT diagnostics are not measurements of a spatial cymatic plate field.
+- Relative STFT magnitude is not calibrated sound-pressure level.
+- STFT phase is audio-domain phase, not a spatial plate-field phase map.
+- This stage does not establish acoustic-pressure calibration, acoustic-to-force transfer calibration, plate response, or particle/contact validation.
+- The alternate recording does not clear the separate HFR-06 canonical source-hash gate.
+
+## Tests
 
 Run the unit tests from the repository root:
 
 ```powershell
-python -m pip install numpy matplotlib
+python -m pip install numpy matplotlib scipy
 python -m unittest discover -s cpe_hfr02/diagnostics/tests -v
 ```
 
 The GitHub Actions workflow `.github/workflows/cpe-hfr02-diagnostics.yml` runs these tests on relevant pushes and pull requests. Tests use generated fixtures and verify software behavior; they do not validate the external recording or any physical system.
-
-The generator checks provenance status, source/WAV SHA-256 values, PCM format, array dimensions, finite values, monotonic axes, and frequency bounds. It does **not** recompute the STFT from the WAV, so its checks do not prove that the stored arrays were derived from that WAV. That limitation is recorded in the JSON report.
