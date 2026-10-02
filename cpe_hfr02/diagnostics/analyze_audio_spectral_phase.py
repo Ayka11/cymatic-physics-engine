@@ -102,14 +102,32 @@ def analyze(input_dir: Path, min_frequency_hz: float = 50.0,
         fractions = np.mean(support, axis=1)
         adjacent_pairs = support[:, 1:] & support[:, :-1]
         frame_supported_count = int(np.sum(fractions >= 0.8))
-        pair_eligible_count = int(np.sum(
-            (fractions >= 0.8) & (np.sum(adjacent_pairs, axis=1) >= 2)
-        ))
+        valid_pair_counts = np.sum(adjacent_pairs, axis=1)
+        eligible_mask = (fractions >= 0.8) & (valid_pair_counts >= 2)
+        pair_eligible_count = int(np.sum(eligible_mask))
+        threshold_phase_rows = []
+        for i in np.flatnonzero(eligible_mask):
+            vals = residual[i, adjacent_pairs[i]]
+            concentration = float(np.abs(np.mean(np.exp(1j * vals))))
+            threshold_phase_rows.append({
+                "frequency_hz": float(frequencies[i]),
+                "supported_frame_fraction": float(fractions[i]),
+                "valid_frame_pairs": int(valid_pair_counts[i]),
+                "phase_increment_residual_circular_concentration": concentration,
+            })
+        threshold_phase_rows.sort(
+            key=lambda item: (
+                item["phase_increment_residual_circular_concentration"],
+                item["frequency_hz"],
+            ),
+            reverse=True,
+        )
         phase_support_sensitivity.append({
             "magnitude_floor_db_relative_to_global_peak": floor_db,
             "frequency_bins_meeting_frame_support": frame_supported_count,
             "frequency_bins_meeting_frame_and_pair_support": pair_eligible_count,
             "maximum_supported_frame_fraction": float(np.max(fractions)),
+            "eligible_bin_phase_summary": threshold_phase_rows[:20],
         })
 
     return {
