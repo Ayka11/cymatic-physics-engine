@@ -45,9 +45,20 @@ jobs:
       - name: Construct Gradio app smoke test
         run: |
           python - <<'PY'
-          import app
-          assert app.demo is not None, "Gradio demo was not constructed"
-          assert hasattr(app.demo, "launch"), "Gradio demo has no launch method"
+          import importlib.util
+          from pathlib import Path
+
+          entrypoint_path = Path("app.py")
+          spec = importlib.util.spec_from_file_location("cpe_v715_entrypoint", entrypoint_path)
+          if spec is None or spec.loader is None:
+              raise RuntimeError(f"Cannot load entry point: {entrypoint_path}")
+
+          entrypoint = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(entrypoint)
+
+          demo = getattr(entrypoint, "demo", None)
+          assert demo is not None, "Root app.py did not construct a Gradio demo"
+          assert callable(getattr(demo, "launch", None)), "Gradio demo has no callable launch method"
           print("CPE v7.15 app construction PASS")
           PY
 
