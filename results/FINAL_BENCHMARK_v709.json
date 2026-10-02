@@ -1,0 +1,10 @@
+{
+  "schema": "CPE_FINAL_BENCHMARK_v709",
+  "release": "CPE_E2_MASTER_v7.09",
+  "status": "BLOCKED",
+  "reason": "real_v706_dataset_and_v707_v708_pass_artifacts_are_not_present_in_release_package",
+  "dataset_target": 680,
+  "real_mms_fa_execution_available_in_package": false,
+  "scientific_evidence_level_maximum": "E1",
+  "fail_closed": true
+}

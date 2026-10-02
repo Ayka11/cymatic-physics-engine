@@ -1,0 +1,20 @@
+{
+  "release": "CPE_E2_MASTER_v7.06",
+  "status": "IMPLEMENTED_BLOCKED_UNTIL_REAL_INPUT",
+  "stage": "680-Candidate Dataset Builder",
+  "scientific_evidence_level_maximum": "E1",
+  "upstream": "CPE_E2_MASTER_v7.05",
+  "target_records": 680,
+  "phones": 34,
+  "records_per_phone": 20,
+  "real_mms_fa_execution_available_in_package": false,
+  "dataset_emitted": false,
+  "reason": "No complete v7.05 PASS selection backed by real MMS-FA execution is present; fail-closed builder correctly refuses fabrication.",
+  "forbidden_fallbacks": [
+    "manual",
+    "guessed",
+    "synthetic",
+    "repaired",
+    "duplicated"
+  ]
+}

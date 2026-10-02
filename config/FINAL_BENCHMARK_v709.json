@@ -1,0 +1,13 @@
+{
+  "schema": "CPE_FINAL_BENCHMARK_v709",
+  "dataset_target": 680,
+  "phone_count": 34,
+  "candidates_per_phone": 20,
+  "min_confidence": 0.60,
+  "requires_real_mms_fa": true,
+  "requires_v707_pass_or_review": true,
+  "requires_v708_manifest_pass": true,
+  "requires_deterministic_rerun": true,
+  "fail_closed": true,
+  "forbidden_fallbacks": ["manual", "guessed", "synthetic", "repaired", "duplicated"]
+}

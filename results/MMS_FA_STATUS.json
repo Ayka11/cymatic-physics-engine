@@ -1,0 +1,8 @@
+{
+  "status": "BLOCKED",
+  "model": "MMS_FA",
+  "model_weights_available": false,
+  "model_execution_performed": false,
+  "reason": "MMS_FA_model_weights_not_available",
+  "scientific_evidence_level_maximum": "E1"
+}

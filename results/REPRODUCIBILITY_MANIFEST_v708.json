@@ -1,0 +1,82 @@
+{
+  "schema": "CPE_REPRODUCIBILITY_MANIFEST_v708",
+  "release": "CPE_E2_MASTER_v7.08",
+  "artifacts": {
+    "mms_fa_status": {
+      "path": "results/MMS_FA_STATUS.json",
+      "sha256": "9bb428af05fa60f4626cf565c8d9dd34c57be6218eb355bf8a7c50f926ad7b35",
+      "status": "BLOCKED",
+      "schema": null
+    },
+    "alignment_validator_status": {
+      "path": "results/ALIGNMENT_VALIDATOR_STATUS.json",
+      "sha256": "af71704e6efb37e051d58702094dd2ad10dfd123c7df173f560c61a367c2d923",
+      "status": "IMPLEMENTED",
+      "schema": null
+    },
+    "candidate_qc_status": {
+      "path": "results/CANDIDATE_QC_STATUS.json",
+      "sha256": "52a265cb7ac17331b6894e8cca486a2b6ed874a886f60216eb91b39af35dda35",
+      "status": "IMPLEMENTED",
+      "schema": null
+    },
+    "dataset_builder_status": {
+      "path": "results/DATASET_BUILDER_STATUS.json",
+      "sha256": "3545197a521bf378029293dab8c2cdba63ea559498ba38d3beedc424a54cdf81",
+      "status": "IMPLEMENTED_BLOCKED_UNTIL_REAL_INPUT",
+      "schema": null
+    },
+    "corpus_balance_qc_status": {
+      "path": "results/CORPUS_BALANCE_QC_STATUS.json",
+      "sha256": "aaa04966e05925dda9423dfa4e633dc267c2fa4af1ca010112621a5a46247406",
+      "status": "BLOCKED",
+      "schema": "CPE_CORPUS_BALANCE_QC_v707"
+    }
+  },
+  "source_hashes": {
+    "config/ALIGNMENT_VALIDATOR_v704.json": "5a0d8635155bee6a3d95b2f5a358d04f26ae50a96201f9d97936a72a2c582377",
+    "config/CANDIDATE_QC_v705.json": "4f6e84ad0b220b448d0407bb62ceb26c77cf5de481fe8038ebf588efff23c1d1",
+    "config/CORPUS_BALANCE_QC_v707.json": "9061078c98ada48d29e264445cc150990f5a04662b3c2c39c65607a4d8a9bce5",
+    "config/DATASET_BUILDER_v706.json": "a31cc01f2e9c23a0fe0cc0284c9b3db1f204f71d883fb22110b8c093fdbc2c87",
+    "config/MMS_FA_PRODUCTION_v703.json": "78056682d59ad306689d89bce78182588e1d7bcdc38745840521c01ad256f7d0",
+    "config/REPRODUCIBILITY_MANIFEST_v708.json": "a155c5a16263a44046f7ad6882a0542c26fe20b422c1f87a580eec0c764e7994",
+    "cymatic_engine/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cymatic_engine/alignment/__init__.py": "c2896dae7ea09aaf636d2234b1426be6d4279a38b529940179357da1b6f25091",
+    "cymatic_engine/alignment/mms_fa.py": "71ecb2d18e5d302b85e91ea38113a54ffe19593ed19216657186f91f4a916631",
+    "cymatic_engine/alignment/validator.py": "6ca006f6ddb70d77eef4e10298e149d518bd8ec9cae7a0ca828e3df4259c7a57",
+    "cymatic_engine/candidates/__init__.py": "7dc490363aee0ce7eb5f62b0bd9dbf0b16bba0807e6977f5188d0c24ee1e0aba",
+    "cymatic_engine/candidates/qc.py": "0ce4a57fbc673af2e82bb2defedf4f925e75b85f189af1242077402b6a790a46",
+    "cymatic_engine/corpus/__init__.py": "b5fec3ac1467694c490440a60de66b0a0335cf1b15345ca9a8ec8d5ef2ff8afb",
+    "cymatic_engine/corpus/balance_qc.py": "8f9bb36e832a5be312c420726a8ea0e5627da682199f7157068e75ac2690e435",
+    "cymatic_engine/dataset/__init__.py": "7a7adbce5f6037b9d379dfbb387b446cb7089bf7a6faf8dfa36116b521a51fd0",
+    "cymatic_engine/dataset/builder.py": "24ef01b8bb5d3fd9411609ab6afd846af8dcb964c23e3d6899a00ceffa3f2719",
+    "cymatic_engine/provenance/__init__.py": "5a5a910c5a15523d9ff22f46bde0bfb1f0375b7ada6a2084406928a8096a8f5a",
+    "cymatic_engine/provenance_manifest.py": "1240f6a8caa25e7860625df5de0b04231fadefa7e998d6bef680fe0060d263c2"
+  },
+  "environment": {
+    "python": "3.13.5",
+    "platform": "Linux-6.18.44-x86_64-with-glibc2.41",
+    "implementation": "CPython"
+  },
+  "fail_closed": true,
+  "status": "BLOCKED",
+  "failures": [
+    "mms_fa_not_executed_or_weights_unavailable",
+    "upstream_not_pass:alignment_validator_status",
+    "upstream_not_pass:candidate_qc_status",
+    "upstream_not_pass:dataset_builder_status",
+    "upstream_not_pass:corpus_balance_qc_status"
+  ],
+  "chain_sha256": "0cfe3147bf78d964bae995d509149f42bf65613d95bec44084fa2286076abf48",
+  "scientific_evidence_level_maximum": "E1",
+  "reproducibility_policy": {
+    "content_addressed": true,
+    "no_synthetic_artifacts": true,
+    "no_missing_artifact_substitution": true,
+    "environment_recorded": true,
+    "upstream_statuses_required": [
+      "PASS",
+      "PASS_WITH_REVIEW"
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "schema": "CPE_MMS_FA_RUNTIME_v711",
+  "backend": "torchaudio.pipelines.MMS_FA",
+  "sample_rate": 16000,
+  "with_star": false,
+  "manual_fallback": false,
+  "synthetic_alignment": false,
+  "fail_closed": true,
+  "phone_projection_required": true,
+  "phone_projection_note": "MMS_FA aligns normalized character/token sequences; it does not directly emit the 34-phone vocabulary. A separate documented phone projection is mandatory before v7.04 phone validation.",
+  "source": "https://docs.pytorch.org/audio/2.8/tutorials/forced_alignment_for_multilingual_data_tutorial.html"
+}

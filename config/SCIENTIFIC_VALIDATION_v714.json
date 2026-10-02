@@ -1,0 +1,9 @@
+{
+  "schema": "CPE_SCIENTIFIC_VALIDATION_v714",
+  "version": "v7.14",
+  "hard_requirements": ["benchmark_pass", "680_records", "34x20_coverage", "confidence_floor", "positive_durations", "speaker_minimum", "provenance_manifest_pass", "deterministic_rerun"],
+  "scientific_reference_requirement": "independent_reference_alignment_for_accuracy_claims",
+  "synthetic_candidates_allowed": false,
+  "manual_candidates_allowed": false,
+  "fail_closed": true
+}
