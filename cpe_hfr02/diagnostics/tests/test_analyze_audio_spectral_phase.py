@@ -40,6 +40,20 @@ class AudioSpectralPhaseReportTests(unittest.TestCase):
                     row["frequency_bins_meeting_frame_and_pair_support"],
                     row["frequency_bins_meeting_frame_support"],
                 )
+                phase_summary = row["eligible_bin_phase_summary"]
+                self.assertLessEqual(
+                    len(phase_summary),
+                    row["frequency_bins_meeting_frame_and_pair_support"],
+                )
+                for bin_row in phase_summary:
+                    self.assertGreaterEqual(bin_row["supported_frame_fraction"], 0.8)
+                    self.assertGreaterEqual(bin_row["valid_frame_pairs"], 2)
+                    self.assertGreaterEqual(
+                        bin_row["phase_increment_residual_circular_concentration"], 0.0
+                    )
+                    self.assertLessEqual(
+                        bin_row["phase_increment_residual_circular_concentration"], 1.0
+                    )
             self.assertIn("does not clear the HFR-06", " ".join(report["limitations"]))
 
     def test_tampered_saved_stft_fails_before_analysis(self):
