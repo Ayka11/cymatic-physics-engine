@@ -28,6 +28,18 @@ class AudioSpectralPhaseReportTests(unittest.TestCase):
             self.assertEqual(report["summary"]["frame_count"], 48)
             self.assertEqual(len(report["frame_metrics"]), 48)
             self.assertIn("not spatial phase", report["audio_domain_phase_diagnostic"]["interpretation"].lower())
+            sensitivity = report["audio_domain_phase_diagnostic"]["support_sensitivity"]
+            self.assertEqual(
+                [row["magnitude_floor_db_relative_to_global_peak"] for row in sensitivity],
+                [-20.0, -30.0, -40.0, -50.0, -60.0],
+            )
+            self.assertEqual(len(sensitivity), 5)
+            for row in sensitivity:
+                self.assertGreaterEqual(row["frequency_bins_meeting_frame_and_pair_support"], 0)
+                self.assertLessEqual(
+                    row["frequency_bins_meeting_frame_and_pair_support"],
+                    row["frequency_bins_meeting_frame_support"],
+                )
             self.assertIn("does not clear the HFR-06", " ".join(report["limitations"]))
 
     def test_tampered_saved_stft_fails_before_analysis(self):
