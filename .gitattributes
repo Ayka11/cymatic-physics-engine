@@ -1,2 +1,0 @@
-assets/hfr09/*.png filter=lfs diff=lfs merge=lfs -text
-assets/hfr09/audio/*.wav filter=lfs diff=lfs merge=lfs -text
