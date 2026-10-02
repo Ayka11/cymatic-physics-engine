@@ -47,6 +47,18 @@ class FrequencyPeakRobustnessTests(unittest.TestCase):
             self.assertEqual(report["scientific_scope"]["hfr06_source_hash_gate"],
                              "REMAINS_CLOSED_FOR_ALTERNATE_SOURCE")
 
+    def test_candidate_assignment_is_one_to_one(self):
+        sys.path.insert(0, str(SCRIPT.parent))
+        try:
+            from analyze_frequency_peak_robustness import _match_candidates_one_to_one
+            references = [{"frequency_hz": 100.0}, {"frequency_hz": 110.0}]
+            candidates = [{"frequency_hz": 105.0}]
+            assigned = _match_candidates_one_to_one(references, candidates, 10.0)
+            self.assertEqual(len(assigned), 1)
+            self.assertEqual(next(iter(assigned.values())), candidates[0])
+        finally:
+            sys.path.pop(0)
+
     def test_resolution_tolerance_uses_window_not_zero_padding(self):
         sys.path.insert(0, str(SCRIPT.parent))
         try:

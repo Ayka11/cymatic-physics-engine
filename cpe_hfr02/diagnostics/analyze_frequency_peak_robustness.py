@@ -60,6 +60,30 @@ def _peak_rows(frequencies: np.ndarray, mean_magnitude: np.ndarray,
     return rows
 
 
+
+def _match_candidates_one_to_one(reference_candidates: list[dict],
+                                 candidate_peaks: list[dict],
+                                 tolerance_hz: float) -> dict[int, dict]:
+    """Greedily assign peaks by nearest frequency, with no candidate reused."""
+    pairs = sorted(
+        (
+            abs(float(candidate["frequency_hz"]) - float(reference["frequency_hz"])),
+            reference_index,
+            candidate_index,
+        )
+        for reference_index, reference in enumerate(reference_candidates)
+        for candidate_index, candidate in enumerate(candidate_peaks)
+        if abs(float(candidate["frequency_hz"]) - float(reference["frequency_hz"])) <= tolerance_hz
+    )
+    assigned: dict[int, dict] = {}
+    used_candidate_indices: set[int] = set()
+    for _, reference_index, candidate_index in pairs:
+        if reference_index in assigned or candidate_index in used_candidate_indices:
+            continue
+        assigned[reference_index] = candidate_peaks[candidate_index]
+        used_candidate_indices.add(candidate_index)
+    return assigned
+
 def _phase_at_frequency(z: np.ndarray, frequencies: np.ndarray, index: int,
                         hop: int, sample_rate_hz: int, global_peak: float) -> dict:
     magnitude = np.abs(z[index, :])
@@ -146,17 +170,25 @@ def analyze_frequency_peak_robustness(
     if baseline is None:
         raise ValueError("Baseline STFT configuration could not be evaluated.")
 
+    assignments_by_configuration = []
+    tolerances_by_configuration = []
+    for row in evaluated:
+        tolerance = resolution_aware_tolerance_hz(
+            sample_rate, BASELINE["nperseg"], row["nperseg"]
+        )
+        assignments_by_configuration.append(
+            _match_candidates_one_to_one(baseline["candidates"], row["candidates"], tolerance)
+        )
+        tolerances_by_configuration.append(tolerance)
+
     tracked = []
-    for rank, reference in enumerate(baseline["candidates"], start=1):
+    for reference_index, reference in enumerate(baseline["candidates"]):
+        rank = reference_index + 1
         reference_hz = reference["frequency_hz"]
         matches = []
         for config_index, row in enumerate(evaluated):
-            tolerance = resolution_aware_tolerance_hz(
-                sample_rate, BASELINE["nperseg"], row["nperseg"]
-            )
-            nearest = min(row["candidates"],
-                          key=lambda p: abs(p["frequency_hz"] - reference_hz),
-                          default=None)
+            tolerance = tolerances_by_configuration[config_index]
+            nearest = assignments_by_configuration[config_index].get(reference_index)
             if nearest is None or abs(nearest["frequency_hz"] - reference_hz) > tolerance:
                 matches.append({
                     "configuration_index": config_index, "nperseg": row["nperseg"],
