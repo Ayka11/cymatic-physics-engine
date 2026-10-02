@@ -1,0 +1,31 @@
+name: CPE HFR-02 diagnostic visualization tests
+
+on:
+  push:
+    paths:
+      - "cpe_hfr02/diagnostics/**"
+      - ".github/workflows/cpe-hfr02-diagnostics.yml"
+  pull_request:
+    paths:
+      - "cpe_hfr02/diagnostics/**"
+      - ".github/workflows/cpe-hfr02-diagnostics.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostics-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test dependencies
+        run: python -m pip install --upgrade pip numpy matplotlib
+      - name: Run fail-closed diagnostic tests
+        run: python -m unittest discover -s cpe_hfr02/diagnostics/tests -v
