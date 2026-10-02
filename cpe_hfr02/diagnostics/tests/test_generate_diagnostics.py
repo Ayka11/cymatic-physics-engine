@@ -65,7 +65,8 @@ class DiagnosticVisualizationTests(unittest.TestCase):
             root = make_fixture(Path(td) / "input")
             out = Path(td) / "out"
             result = subprocess.run(
-                [sys.executable, str(SCRIPT), "--input", str(root), "--out", str(out)],
+                [sys.executable, str(SCRIPT), "--input", str(root), "--out", str(out),
+                 "--max-frequency", "30000"],
                 capture_output=True, text=True, timeout=90)
             self.assertEqual(result.returncode, 0, msg=result.stdout + "\n" + result.stderr)
             expected = [
@@ -93,6 +94,41 @@ class DiagnosticVisualizationTests(unittest.TestCase):
                 capture_output=True, text=True, timeout=90)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("WAV hash mismatch", result.stderr)
+
+    def test_malformed_stft_shape_fails_closed(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = make_fixture(Path(td) / "input")
+            with np.load(root / "complex_stft.npz", allow_pickle=False) as z:
+                f = z["frequency_hz"]
+                t = z["time_s"]
+                real = z["field_real"][:, :-1]
+                imag = z["field_imag"][:, :-1]
+            np.savez_compressed(root / "complex_stft.npz",
+                                frequency_hz=f, time_s=t,
+                                field_real=real, field_imag=imag)
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--input", str(root)],
+                capture_output=True, text=True, timeout=90)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Array shape mismatch", result.stderr)
+
+    def test_nonfinite_stft_fails_closed(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = make_fixture(Path(td) / "input")
+            with np.load(root / "complex_stft.npz", allow_pickle=False) as z:
+                f = z["frequency_hz"]
+                t = z["time_s"]
+                real = z["field_real"].copy()
+                imag = z["field_imag"].copy()
+            real[5, 5] = np.nan
+            np.savez_compressed(root / "complex_stft.npz",
+                                frequency_hz=f, time_s=t,
+                                field_real=real, field_imag=imag)
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--input", str(root)],
+                capture_output=True, text=True, timeout=90)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Non-finite data", result.stderr)
 
     def test_wrong_status_fails_closed(self):
         with tempfile.TemporaryDirectory() as td:
