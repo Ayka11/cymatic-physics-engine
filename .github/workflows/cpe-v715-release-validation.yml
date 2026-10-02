@@ -31,16 +31,15 @@ jobs:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: requirements.txt
-      - name: Install declared application dependencies
+      - name: Install declared dependencies and test runner
         run: |
           python -m pip install --upgrade pip
           python -m pip install --prefer-binary -r requirements.txt
+          python -m pip install 'pytest>=8,<9'
       - name: Compile Python sources
         run: python -m compileall -q app cymatic_engine cpe_hfr02 tests
-      - name: Run full application test suite
-        run: python -m unittest discover -s tests -v
-      - name: Run HFR-02 diagnostic test suite
-        run: python -m unittest discover -s cpe_hfr02/diagnostics/tests -v
+      - name: Run full test suite
+        run: python -m pytest -q
       - name: Construct Gradio app smoke test
         run: |
           python - <<'PY'
