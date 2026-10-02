@@ -48,3 +48,29 @@ The alternate recording does not clear the separate HFR-06 canonical source-hash
 ## Local generation
 
 Use the accompanying `generate_diagnostics.py` script with the existing CPE HFR-02 Russian Mama run directory.
+
+## Quantitative metrics added in the current utility
+
+The JSON report now includes the following descriptive signal metrics:
+
+- RMS normalized PCM amplitude.
+- Peak absolute normalized PCM amplitude.
+- Crest factor (peak divided by RMS; null for an all-zero signal).
+- Count and fraction of samples at the signed PCM full-scale threshold.
+- Zero-crossing rate per sample.
+- Up to ten prominent local peaks from the mean STFT magnitude, expressed as frequency and relative dB.
+
+These are signal-description metrics only. The listed spectral peaks are not automatically interpreted as phonemes, resonant modes, or evidence of physical cymatic effects.
+
+## Validation and tests
+
+Run the unit tests from the repository root:
+
+```powershell
+python -m pip install numpy matplotlib
+python -m unittest discover -s cpe_hfr02/diagnostics/tests -v
+```
+
+The GitHub Actions workflow `.github/workflows/cpe-hfr02-diagnostics.yml` runs these tests on relevant pushes and pull requests. Tests use generated fixtures and verify software behavior; they do not validate the external recording or any physical system.
+
+The generator checks provenance status, source/WAV SHA-256 values, PCM format, array dimensions, finite values, monotonic axes, and frequency bounds. It does **not** recompute the STFT from the WAV, so its checks do not prove that the stored arrays were derived from that WAV. That limitation is recorded in the JSON report.
