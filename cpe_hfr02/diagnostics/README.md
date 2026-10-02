@@ -46,9 +46,21 @@ The verifier checks source and WAV hashes against provenance, requires the recor
 
 A successful report uses status `STFT_REPRODUCIBILITY_VERIFIED_E0`. This means only that the stored audio-domain STFT is numerically reproducible from the WAV under the specified settings. It does not establish spatial cymatic structure or a physical effect.
 
+## Quantitative spectral and audio-domain phase report
+
+After the independent STFT verifier passes, generate frame-level spectral metrics and a carefully scoped audio-domain phase diagnostic:
+
+```powershell
+python cpe_hfr02/diagnostics/analyze_audio_spectral_phase.py --input "C:\path\to\CPE_HFR02_RussianMama_Run" --out "C:\path\to\audio_spectral_phase_report.json"
+```
+
+The report contains per-frame band peak frequency and magnitude, spectral centroid, spectral flatness, and an audio-domain phase-increment residual concentration for frequency bins that meet an explicit relative-magnitude support threshold. The script calls the reproducibility verifier first and refuses to analyze if source/WAV hashes or the saved complex STFT fail validation.
+
+Phase concentration is descriptive and depends on the selected STFT settings and magnitude threshold. It is not spatial phase, not a physical resonance measurement, and not evidence of a cymatic effect. The report preserves the HFR-06 gate limitation.
+
 ## UTF-8 provenance metadata repair
 
-The current local provenance output displayed `source_word` as mojibake (`РјР°РјР°`) instead of `мама`. This is a metadata text-encoding issue; it does not change the audio bytes or their SHA-256 values.
+The original local provenance output had displayed `source_word` as mojibake (`РјР°РјР°`). The current run now reports `source_word: мама` and the repair utility correctly returns `NO_CHANGE_NEEDED`; no edit is necessary. This was a metadata-only encoding issue and did not change audio bytes or their SHA-256 values.
 
 Preview the narrowly scoped repair first:
 
