@@ -27,9 +27,10 @@ def spectral_peak_summary(frequency_hz: np.ndarray, magnitude: np.ndarray,
     eligible = np.flatnonzero((frequency_hz > 0) & (frequency_hz <= max_frequency_hz))
     if eligible.size < 3:
         return []
-    candidates = eligible[
-        (mean_magnitude[eligible] >= mean_magnitude[eligible - 1]) &
-        (mean_magnitude[eligible] > mean_magnitude[eligible + 1])
+    interior = eligible[(eligible > 0) & (eligible < frequency_hz.size - 1)]
+    candidates = interior[
+        (mean_magnitude[interior] >= mean_magnitude[interior - 1]) &
+        (mean_magnitude[interior] > mean_magnitude[interior + 1])
     ]
     if candidates.size == 0:
         candidates = eligible
