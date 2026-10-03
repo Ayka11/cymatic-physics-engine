@@ -42,11 +42,14 @@ jobs:
         run: python -m compileall -q app cymatic_engine cpe_hfr02 tests
       - name: Run full test suite
         run: python -m pytest -q
-      - name: Construct Gradio app smoke test
+      - name: Construct and serve Gradio app smoke test
         run: |
           python - <<'PY'
           import importlib.util
+          import time
           from pathlib import Path
+          from urllib.error import URLError
+          from urllib.request import urlopen
 
           entrypoint_path = Path("app.py")
           spec = importlib.util.spec_from_file_location("cpe_v715_entrypoint", entrypoint_path)
@@ -59,7 +62,33 @@ jobs:
           demo = getattr(entrypoint, "demo", None)
           assert demo is not None, "Root app.py did not construct a Gradio demo"
           assert callable(getattr(demo, "launch", None)), "Gradio demo has no callable launch method"
-          print("CPE v7.15 app construction PASS")
+
+          try:
+              demo.launch(
+                  server_name="127.0.0.1",
+                  server_port=7860,
+                  quiet=True,
+                  prevent_thread_lock=True,
+                  show_error=True,
+              )
+              last_error = None
+              for _ in range(30):
+                  try:
+                      with urlopen("http://127.0.0.1:7860/", timeout=2) as response:
+                          assert response.status == 200, f"Unexpected HTTP status: {response.status}"
+                          html = response.read(4096).decode("utf-8", errors="replace")
+                          assert "<html" in html.lower(), "Gradio root response was not HTML"
+                          print("CPE v7.15 app construction and HTTP smoke test PASS")
+                          break
+                  except (URLError, TimeoutError, OSError) as exc:
+                      last_error = exc
+                      time.sleep(1)
+              else:
+                  raise RuntimeError(f"Gradio app did not serve HTTP successfully: {last_error}")
+          finally:
+              close = getattr(demo, "close", None)
+              if callable(close):
+                  close()
           PY
 
   deploy-staging:
