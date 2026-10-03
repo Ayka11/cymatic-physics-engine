@@ -14,6 +14,21 @@ This matrix distinguishes implementation state from evidence readiness. A status
 | ALIGNMENT_VALIDATOR_STATUS.json | IMPLEMENTED | actual MMS-FA alignment output; validation results; source/hash integrity | implementation-only, not an alignment PASS |
 | MMS_FA_STATUS.json | BLOCKED | model weights available; model execution performed; execution provenance and output artifact recorded | BLOCKED |
 
+## Explicit provenance flags required by the v7.15 UI gate
+
+The UI gate treats each of the following as a separate, explicit Boolean evidence assertion; an absent field is not interpreted as true:
+
+- `REAL_CORPUS_RUN_v713_STATUS.json`: `real_corpus_present`, `real_mms_fa_execution_performed`, and `source_provenance_recorded`.
+- `SCIENTIFIC_VALIDATION_v714_STATUS.json`: real corpus and execution, source provenance, an independent reference, and explicit permission for the specific accuracy claim.
+- `MMS_FA_STATUS.json`: model weights, model execution, execution provenance, and a recorded output artifact.
+- `ALIGNMENT_VALIDATOR_STATUS.json`: fail-closed mode, real execution, alignment output, executed validation, emitted validation result, source/hash integrity, and validation provenance.
+- `CANDIDATE_QC_STATUS.json`: real execution, alignment output, candidate QC execution, emitted selection, and candidate-QC provenance.
+- `DATASET_BUILDER_STATUS.json`: real execution, upstream candidate-QC pass, explicit v7.05 pass, emitted dataset, and dataset provenance.
+- `CORPUS_BALANCE_QC_STATUS.json`: dataset and dataset provenance, executed QC, emitted QC report, and QC provenance.
+- `V7_09_STATUS.json`: real execution availability and execution, emitted benchmark, v7.07/v7.08 passes, independent deterministic rerun, and benchmark provenance.
+
+These flags are assertions that must be backed by the named evidence artifacts and provenance records. Setting a flag to `true` without those records is not scientific validation; the UI gate is a fail-closed guard, not an independent provenance verifier for every upstream artifact.
+
 ## Gate design requirements
 
 1. Preserve the declared status in a separate field; never silently overwrite provenance.

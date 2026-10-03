@@ -32,29 +32,37 @@ def _apply_evidence_gate(name, data):
     requirements = {
         "REAL_CORPUS_RUN_v713_STATUS.json": (
             "real_corpus_present", "real_mms_fa_execution_performed",
+            "source_provenance_recorded",
         ),
         "SCIENTIFIC_VALIDATION_v714_STATUS.json": (
             "real_corpus_present", "real_mms_fa_execution_performed",
-            "independent_reference_present", "scientific_accuracy_claim_allowed",
+            "source_provenance_recorded", "independent_reference_present",
+            "scientific_accuracy_claim_allowed",
         ),
         "V7_09_STATUS.json": (
             "real_mms_fa_execution_available_in_package", "real_mms_fa_execution_performed",
             "benchmark_result_emitted", "v707_pass", "v708_manifest_pass",
-            "independent_deterministic_rerun_pass",
+            "independent_deterministic_rerun_pass", "benchmark_provenance_recorded",
         ),
         "DATASET_BUILDER_STATUS.json": (
             "real_mms_fa_execution_available_in_package", "real_mms_fa_execution_performed",
-            "upstream_candidate_qc_pass", "dataset_emitted",
+            "upstream_candidate_qc_pass", "upstream_v7_05_pass", "dataset_emitted",
+            "dataset_provenance_recorded",
         ),
         "CANDIDATE_QC_STATUS.json": (
             "real_mms_fa_execution_available_in_package", "real_mms_fa_execution_performed",
             "alignment_output_present", "candidate_qc_executed", "selection_emitted",
+            "candidate_qc_provenance_recorded",
         ),
         "ALIGNMENT_VALIDATOR_STATUS.json": (
             "fail_closed", "real_mms_fa_execution_performed",
             "alignment_output_present", "validation_executed", "validation_result_emitted",
+            "source_hash_integrity_pass", "validation_provenance_recorded",
         ),
-        "MMS_FA_STATUS.json": ("model_weights_available", "model_execution_performed"),
+        "MMS_FA_STATUS.json": (
+            "model_weights_available", "model_execution_performed",
+            "execution_provenance_recorded", "output_artifact_recorded",
+        ),
     }
     result = dict(data)
     declared_status = str(data.get("status", "UNKNOWN")).upper()
@@ -126,7 +134,8 @@ def _apply_evidence_gate(name, data):
 
     # A corpus-balance report needs an actual input dataset and an emitted QC result.
     requirements["CORPUS_BALANCE_QC_STATUS.json"] = (
-        "dataset_present", "qc_executed", "qc_report_emitted",
+        "dataset_present", "dataset_provenance_recorded", "qc_executed",
+        "qc_report_emitted", "qc_provenance_recorded",
     )
     gated_names = set(requirements)
     if name not in gated_names:
