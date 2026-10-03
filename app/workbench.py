@@ -12,6 +12,7 @@ from cymatic_engine.experiment.models import ExperimentManifest
 from cymatic_engine.calibration.models import CalibrationManifest
 from cymatic_engine.calibration.validation import evaluate_physical_validation
 from cymatic_engine.experiment.physical_validation_adapter import build_physical_validation_record
+from cymatic_engine.provenance_manifest import verify_manifest_integrity
 
 ROOT = Path(__file__).resolve().parent.parent
 RESULTS = ROOT / "results"
@@ -85,11 +86,17 @@ def _apply_evidence_gate(name, data):
             missing.append("failures_empty")
         if bad_upstream:
             missing.extend("upstream_pass:" + key for key in bad_upstream)
+        if declared_status not in required_statuses:
+            missing.append("status:PASS_or_PASS_WITH_REVIEW")
+        integrity = verify_manifest_integrity(ROOT, data)
+        result["manifest_integrity"] = integrity
+        if not integrity["valid"]:
+            missing.extend("integrity:" + issue for issue in integrity["issues"])
         blocked = bool(missing)
         result["status"] = "BLOCKED" if blocked else declared_status
-        result["evidence_gate"] = "BLOCKED" if blocked else "EVIDENCE_FLAGS_PRESENT"
+        result["evidence_gate"] = "BLOCKED" if blocked else "EVIDENCE_VERIFIED"
         if blocked:
-            result["gate_reason"] = "Manifest contains failures or upstream artifacts that are not PASS/PASS_WITH_REVIEW."
+            result["gate_reason"] = "Manifest failures, upstream status, or content-integrity checks did not pass."
             result["missing_evidence_flags"] = missing
         return result
 
