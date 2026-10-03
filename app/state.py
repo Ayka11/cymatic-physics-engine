@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import math
 
 @dataclass(frozen=True)
 class PublicLimits:
@@ -21,10 +22,20 @@ REFERENCE_CONFIG = {
 }
 
 def validate_public_request(duration_sec, particle_count):
-    duration_sec=float(duration_sec)
-    particle_count=int(particle_count)
-    if not 0 < duration_sec <= PUBLIC_LIMITS.max_duration_sec:
-        raise ValueError(f"Duration must be in (0, {PUBLIC_LIMITS.max_duration_sec}] seconds.")
+    try:
+        duration_sec = float(duration_sec)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("Duration must be a finite number of seconds.") from exc
+    if not math.isfinite(duration_sec) or not 0 < duration_sec <= PUBLIC_LIMITS.max_duration_sec:
+        raise ValueError(f"Duration must be finite and in (0, {PUBLIC_LIMITS.max_duration_sec}] seconds.")
+
+    try:
+        particle_value = float(particle_count)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("Particle count must be a finite whole number.") from exc
+    if not math.isfinite(particle_value) or not particle_value.is_integer():
+        raise ValueError("Particle count must be a finite whole number.")
+    particle_count = int(particle_value)
     if not 1 <= particle_count <= PUBLIC_LIMITS.max_particles:
         raise ValueError(f"Particle count must be in [1, {PUBLIC_LIMITS.max_particles}].")
     return duration_sec, particle_count
