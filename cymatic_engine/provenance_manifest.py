@@ -112,7 +112,9 @@ def verify_manifest_integrity(root: str | Path, manifest: Mapping[str, Any]) -> 
             else:
                 record_key = label.split(":", 1)[1]
                 record = artifacts.get(record_key) if isinstance(artifacts, Mapping) else None
-                if isinstance(record, Mapping):
+                if not isinstance(parsed, Mapping):
+                    issues.append(f"{label}:json_root_not_object")
+                elif isinstance(record, Mapping):
                     if parsed.get("status") != record.get("status"):
                         issues.append(f"{label}:status_mismatch")
                     if parsed.get("schema") != record.get("schema"):
