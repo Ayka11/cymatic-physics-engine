@@ -111,7 +111,7 @@ def test_failed_pv_cannot_be_promoted():
     assert record["scientific_status"] == "PARTIAL_PHYSICAL_VALIDATION"
 
 
-def test_explicit_evidence_level_is_required_for_promotion():
+def test_caller_supplied_evidence_level_cannot_promote_without_verified_gate_record():
     cal = manifest()
     record = build_validated_end_to_end_record(
         source_hash="src",
@@ -121,8 +121,28 @@ def test_explicit_evidence_level_is_required_for_promotion():
         thresholds={"rmse": 0.2},
         validated_evidence_level="E5",
     )
-    assert record["evidence_level"] == "E5"
-    assert record["scientific_status"] == "PHYSICALLY_VALIDATED"
+    assert record["evidence_level"] == "E0"
+    assert record["requested_evidence_level"] == "E5"
+    assert record["evidence_promotion_blocked"] is True
+    assert record["scientific_status"] == "PHYSICAL_VALIDATION_PASSED_EVIDENCE_GATE_PENDING"
+    assert record["claim_guard"]["real_physical_chain_claim"] is False
+    assert record["claim_guard"]["supplied_metrics_thresholds_passed"] is True
+
+
+def test_physical_validation_pass_does_not_assert_real_physical_chain():
+    cal = manifest()
+    record = build_validated_end_to_end_record(
+        source_hash="src",
+        calibration_manifest=cal,
+        level="PV0",
+        metrics={"rmse": 0.1},
+        thresholds={"rmse": 0.2},
+    )
+    assert record["pv_result"]["passed"] is True
+    assert record["claim_guard"]["real_physical_chain_claim"] is False
+    assert record["claim_guard"]["phoneme_identity_claim"] is False
+    assert record["claim_guard"]["glyph_identity_claim"] is False
+    assert record["evidence_level"] == "E0"
 
 
 def test_record_hash_is_deterministic_for_same_record_inputs():
