@@ -39,7 +39,7 @@ def test_manifest_failures_cannot_be_overridden_by_top_level_pass():
     assert "upstream_pass:mms_fa_status" in result["missing_evidence_flags"]
 
 
-def test_manifest_pass_requires_no_failures_and_all_upstream_pass():
+def test_manifest_without_content_hash_records_cannot_pass_gate():
     result = _apply_evidence_gate(
         "REPRODUCIBILITY_MANIFEST_v708.json",
         {
@@ -50,8 +50,9 @@ def test_manifest_pass_requires_no_failures_and_all_upstream_pass():
             "reproducibility_policy": {"upstream_statuses_required": ["PASS", "PASS_WITH_REVIEW"]},
         },
     )
-    assert result["status"] == "PASS"
-    assert result["evidence_gate"] == "EVIDENCE_FLAGS_PRESENT"
+    assert result["status"] == "BLOCKED"
+    assert result["evidence_gate"] == "BLOCKED"
+    assert any(flag.startswith("integrity:") for flag in result["missing_evidence_flags"])
 
 
 def test_explicit_blocked_is_monotonic_even_if_flags_are_true():
