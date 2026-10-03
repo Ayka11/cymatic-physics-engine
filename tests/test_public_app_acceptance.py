@@ -11,6 +11,7 @@ import soundfile as sf
 from app.adapter import (
     REFERENCE_MODAL_TESTS_HZ,
     generate_modal_test_wav,
+    run_public_demo,
     validate_wav_bytes,
 )
 from app.audio.preprocess import prepare_for_cpe
@@ -150,3 +151,25 @@ def test_generate_tone_ui_handler_returns_audio_and_metadata():
     finally:
         if path:
             Path(path).unlink(missing_ok=True)
+
+
+
+def test_pure_tone_experiment_runs_end_to_end_with_scientific_guard():
+    frequency = REFERENCE_MODAL_TESTS_HZ["f11 — 53.318 Hz"]
+    result, status = run_public_demo(
+        duration_sec=0.5,
+        particle_count=64,
+        grapheme="A",
+        phoneme_ipa="/a/",
+        locale="en",
+        input_mode="Pure tone / modal validation",
+        test_frequency_hz=frequency,
+        tone_amplitude=0.25,
+    )
+
+    assert result["mode"] == "pure_tone_modal_validation"
+    assert status["scientific_status"] == "COMPUTED_REDUCED_ORDER_MODAL_TEST"
+    assert status["empirical_force_calibration"] is False
+    assert "not a physical plate measurement" in status["warning"]
+    assert status["modal_mode"]["requested_frequency_hz"] == pytest.approx(frequency)
+    assert status["pattern_metrics"]["formation_integration_steps"] >= 1500
