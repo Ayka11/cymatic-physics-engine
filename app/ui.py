@@ -87,7 +87,7 @@ def _zerogpu_probe():
 def _csv_safe(value):
     # Prevent spreadsheet formula execution for untrusted string fields while
     # leaving numeric values (including negative measurements) numeric.
-    if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@", "\\t", "\\r")):
+    if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@")):
         return "'" + value
     return value
 
