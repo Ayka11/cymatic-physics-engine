@@ -77,10 +77,11 @@ def build_end_to_end_record(
 ):
     """Build a fail-closed end-to-end experiment record.
 
-    A passing physical-validation result does not by itself grant E5.
-    Evidence level is E0 unless an explicit, caller-supplied validated level
-    is provided. This prevents an infrastructure-level PASS from becoming a
-    scientific claim without the required evidence.
+    A passing physical-validation result and a caller-supplied evidence
+    label do not grant promotion. Evidence remains E0 until this function
+    accepts a verifiable independent evidence-gate record. This prevents a
+    metrics PASS or caller label from becoming a scientific claim without
+    the required evidence.
     """
     if not source_hash:
         raise ValueError("source_hash is required")
