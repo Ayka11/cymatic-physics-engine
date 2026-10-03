@@ -84,13 +84,56 @@ def _zerogpu_probe():
     return None
 
 
+def _csv_safe(value):
+    # Prevent spreadsheet formula execution for untrusted string fields while
+    # leaving numeric values (including negative measurements) numeric.
+    if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@", "\\t", "\\r")):
+        return "'" + value
+    return value
+
+
+def _csv_value(value):
+    if isinstance(value, (dict, list, tuple)):
+        return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return value
+
+
 def _csv_bytes(status):
-    output = io.StringIO()
+    """Export scalar experiment metadata, provenance, and every metric group."""
+    output = io.StringIO(newline="")
     writer = csv.writer(output)
-    writer.writerow(["experiment_id", "grapheme", "phoneme_ipa", "metric_group", "metric", "value"])
-    for group in ("acoustic_metrics", "plate_metrics", "pattern_metrics", "stability_metrics"):
-        for key, value in status.get(group, {}).items():
-            writer.writerow([status.get("experiment_id", ""), status.get("grapheme", ""), status.get("phoneme_ipa", ""), group, key, value])
+    writer.writerow(["experiment_id", "grapheme", "phoneme_ipa", "record_group", "field", "value"])
+    identity = [
+        status.get("experiment_id", ""),
+        status.get("grapheme", ""),
+        status.get("phoneme_ipa", ""),
+    ]
+    metric_groups = {
+        "acoustic_metrics", "plate_metrics", "pattern_metrics", "stability_metrics",
+        "physical_measurement", "preprocessing", "generated_test_signal",
+    }
+
+    # Preserve all top-level scalar fields, including scientific status,
+    # warnings, calibration flags, and provenance hashes.
+    for key, value in status.items():
+        if key in metric_groups or isinstance(value, (dict, list, tuple)):
+            continue
+        writer.writerow([*map(_csv_safe, identity), "experiment_metadata", _csv_safe(key), _csv_safe(_csv_value(value))])
+
+    for group in (
+        "acoustic_metrics", "plate_metrics", "pattern_metrics", "stability_metrics",
+        "physical_measurement", "preprocessing", "generated_test_signal",
+    ):
+        values = status.get(group, {})
+        if not isinstance(values, dict):
+            writer.writerow([*map(_csv_safe, identity), group, "_value", _csv_safe(_csv_value(values))])
+            continue
+        for key, value in values.items():
+            writer.writerow([*map(_csv_safe, identity), _csv_safe(group), _csv_safe(str(key)), _csv_safe(_csv_value(value))])
     return output.getvalue().encode("utf-8")
 
 
