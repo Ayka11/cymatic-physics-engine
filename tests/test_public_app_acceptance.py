@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import gradio as gr
+import app.adapter as adapter_module
 import numpy as np
 import pytest
 import soundfile as sf
@@ -173,3 +174,31 @@ def test_pure_tone_experiment_runs_end_to_end_with_scientific_guard():
     assert "not a physical plate measurement" in status["warning"]
     assert status["modal_mode"]["requested_frequency_hz"] == pytest.approx(frequency)
     assert status["pattern_metrics"]["formation_integration_steps"] >= 1500
+
+
+
+def test_pure_tone_temporary_wav_is_removed_when_model_fails(monkeypatch):
+    original_generator = adapter_module.generate_modal_test_wav
+    generated_paths = []
+
+    def tracked_generator(*args, **kwargs):
+        path, metadata = original_generator(*args, **kwargs)
+        generated_paths.append(path)
+        return path, metadata
+
+    def fail_modal_run(*args, **kwargs):
+        raise RuntimeError("simulated modal failure")
+
+    monkeypatch.setattr(adapter_module, "generate_modal_test_wav", tracked_generator)
+    monkeypatch.setattr(adapter_module, "_modal_test_run", fail_modal_run)
+
+    with pytest.raises(RuntimeError, match="simulated modal failure"):
+        adapter_module.run_public_demo(
+            duration_sec=0.5,
+            particle_count=64,
+            input_mode="Pure tone / modal validation",
+            test_frequency_hz=REFERENCE_MODAL_TESTS_HZ["f11 — 53.318 Hz"],
+        )
+
+    assert len(generated_paths) == 1
+    assert not Path(generated_paths[0]).exists()
