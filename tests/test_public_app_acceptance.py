@@ -160,7 +160,7 @@ def test_csv_export_preserves_status_provenance_nested_fields_and_negative_numbe
 def test_csv_export_escapes_formula_like_user_strings_but_not_numeric_values():
     status = {
         "experiment_id": "CSV-SAFETY",
-        "grapheme": "=HYPERLINK(\\"https://example.invalid\\")",
+        "grapheme": "=HYPERLINK(https://example.invalid)",
         "phoneme_ipa": "",
         "scientific_status": "COMPUTED_TEST",
         "acoustic_metrics": {"negative_measurement": -1.25},
