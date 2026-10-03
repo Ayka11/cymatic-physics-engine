@@ -179,123 +179,128 @@ def _real_audio_run(wav_path, duration_sec, particle_count):
     analysis_path, analysis_info, preprocessing = prepare_for_cpe(
         wav_path, target_rate=48000, mono=True
     )
-    # Consume the explicitly preprocessed PCM samples directly. This prevents
-    # the original non-48-kHz upload from reaching the strict CPE reader.
-    processed_audio, processed_fs = __import__("soundfile").read(
-        analysis_path, always_2d=True, dtype="float64"
-    )
-    processed_mono = np.mean(processed_audio, axis=1)
-    audio = profile_from_samples(
-        processed_mono, processed_fs,
-        source_hash=preprocessing["analysis_sha256"],
-        channels=1, n_fft=4096, hop=1024,
-    )
-    if audio.duration_sec < duration_sec:
-        raise ValueError(f"WAV duration {audio.duration_sec:.3f}s is shorter than requested {duration_sec:.3f}s")
-    plate = _plate()
-    response = prescribed_audio_modal_response(audio, plate)
-    ts = reconstruct_modal_stft(response.Q_positive, fs=48000, n_fft=4096, hop=1024)
-    plate_seq = reconstruct_sequence(plate, ts, nx=64, ny=64, max_frames=120)
-    # FIX-CPE-001: the previous implementation advanced particles only once per
-    # sparse plate frame while using the 1/4800 s acoustic/physics timestep.
-    # A 120-frame sequence therefore integrated for only ~25 ms regardless of a
-    # multi-second recording, so particles barely moved and the final density
-    # remained close to the identical random initialization.
-    #
-    # Cymatic accumulation is instead driven here by the time-averaged vibration
-    # intensity I(x,y)=mean(a(x,y,t)^2) over the central steady portion. Particle
-    # drift is then integrated on its own slower pattern-formation clock.
-    acc = np.asarray(plate_seq.acceleration, dtype=np.float64)
-    if acc.ndim != 3 or acc.shape[0] < 2:
-        raise ValueError("Insufficient plate acceleration frames for pattern formation")
-    n_frames = acc.shape[0]
-    start = int(0.20 * n_frames)
-    end = max(start + 1, int(0.90 * n_frames))
-    intensity = np.mean(acc[start:end] ** 2, axis=0)
-    pconf = ParticleConfig(
-        particle_count=particle_count,
-        seed=REFERENCE_CONFIG["particles"]["seed"],
-        dt_sec=1 / 2400,
-        density_nx=128,
-        density_ny=128,
-        gamma=2.5,
-    )
-    integration_time = max(1.5, min(float(duration_sec), 5.0))
-    steps = max(1500, min(4000, int(round(integration_time * 1000))))
-    particle_result, density_history = run_particles_on_intensity(
-        intensity, pconf, integration_time_sec=integration_time, steps=steps,
-        force_scale=0.15, damping=2.5, history_points=24
-    )
-    density_seq = np.asarray(density_history, dtype=np.float64)
-    stability = analyze_stability(
-        density_seq,
-        dt_sec=integration_time / max(1, len(density_seq) - 1),
-    )
-    sig = cymatic_signature(density_seq[-1], stability)
-    # Standard experiment metrics are derived from the actual run; no synthetic
-    # phoneme/letter values are inserted.
-    final_density = np.asarray(density_seq[-1], dtype=float)
-    disp = np.asarray(plate_seq.displacement, dtype=float)
-    acc = np.asarray(plate_seq.acceleration, dtype=float)
-    freq = np.asarray(audio.frequency_hz, dtype=float)
-    mag = np.asarray(audio.magnitude, dtype=float)
-    if mag.ndim == 2:
-        mag = np.mean(mag, axis=1)
-    peak_idx = np.argsort(mag)[-5:][::-1] if mag.size else np.array([], dtype=int)
-    acoustic_metrics = {
-        "sample_rate_hz": float(audio.sample_rate_hz),
-        "duration_sec": float(audio.duration_sec),
-        "rms": float(audio.rms),
-        "peak": float(audio.peak),
-        "clipping_fraction": float(audio.clipping_fraction),
-        "silence_fraction": float(audio.silence_fraction),
-        "dominant_frequencies_hz": [float(freq[i]) for i in peak_idx],
-    }
-    plate_metrics = {
-        "displacement_rms_model_units": float(np.sqrt(np.mean(disp**2))),
-        "displacement_peak_model_units": float(np.max(np.abs(disp))),
-        "acceleration_rms_model_units": float(np.sqrt(np.mean(acc**2))),
-        "acceleration_peak_model_units": float(np.max(np.abs(acc))),
-        "sampled_frames": int(disp.shape[0]),
-    }
-    p = np.maximum(final_density, 0.0); p = p / (p.sum() + 1e-15)
-    yy, xx = np.indices(p.shape, dtype=float)
-    pattern_metrics = {
-        "density_sum": float(final_density.sum()),
-        "density_max": float(final_density.max()) if final_density.size else 0.0,
-        "centroid_x_grid": float((xx*p).sum()),
-        "centroid_y_grid": float((yy*p).sum()),
-        "signature_dimension": int(len(sig)),
-        "formation_model": "time_averaged_intensity_gradient_drift",
-        "formation_frames_used": int(end - start),
-        "formation_integration_steps": int(steps),
-        "formation_integration_time_sec": float(integration_time),
-    }
-    D = np.asarray(stability.frame_distance, dtype=float); C = np.asarray(stability.correlation, dtype=float)
-    stability_metrics = {
-        "state": stability.state,
-        "mean_frame_distance_tail": float(np.mean(D[-10:])) if D.size else 0.0,
-        "final_frame_distance": float(D[-1]) if D.size else 0.0,
-        "mean_correlation_tail": float(np.mean(C[-10:])) if C.size else 1.0,
-        "final_correlation": float(C[-1]) if C.size else 1.0,
-        "convergence_time_sec": stability.convergence_time_sec,
-    }
-    return {
-        "mode": "real_audio_reduced_order",
-        "audio_profile": audio,
-        "modal_response": response,
-        "modal_time_series": ts,
-        "plate_sequence": plate_seq,
-        "particle_result": particle_result,
-        "density_sequence": density_seq,
-        "stability": stability,
-        "signature": sig,
-        "preprocessing": preprocessing,
-        "acoustic_metrics": acoustic_metrics,
-        "plate_metrics": plate_metrics,
-        "pattern_metrics": pattern_metrics,
-        "stability_metrics": stability_metrics,
-    }
+    try:
+        # Consume the explicitly preprocessed PCM samples directly. This prevents
+        # the original non-48-kHz upload from reaching the strict CPE reader.
+        processed_audio, processed_fs = __import__("soundfile").read(
+            analysis_path, always_2d=True, dtype="float64"
+        )
+        processed_mono = np.mean(processed_audio, axis=1)
+        audio = profile_from_samples(
+            processed_mono, processed_fs,
+            source_hash=preprocessing["analysis_sha256"],
+            channels=1, n_fft=4096, hop=1024,
+        )
+        if audio.duration_sec < duration_sec:
+            raise ValueError(f"WAV duration {audio.duration_sec:.3f}s is shorter than requested {duration_sec:.3f}s")
+        plate = _plate()
+        response = prescribed_audio_modal_response(audio, plate)
+        ts = reconstruct_modal_stft(response.Q_positive, fs=48000, n_fft=4096, hop=1024)
+        plate_seq = reconstruct_sequence(plate, ts, nx=64, ny=64, max_frames=120)
+        # FIX-CPE-001: the previous implementation advanced particles only once per
+        # sparse plate frame while using the 1/4800 s acoustic/physics timestep.
+        # A 120-frame sequence therefore integrated for only ~25 ms regardless of a
+        # multi-second recording, so particles barely moved and the final density
+        # remained close to the identical random initialization.
+        #
+        # Cymatic accumulation is instead driven here by the time-averaged vibration
+        # intensity I(x,y)=mean(a(x,y,t)^2) over the central steady portion. Particle
+        # drift is then integrated on its own slower pattern-formation clock.
+        acc = np.asarray(plate_seq.acceleration, dtype=np.float64)
+        if acc.ndim != 3 or acc.shape[0] < 2:
+            raise ValueError("Insufficient plate acceleration frames for pattern formation")
+        n_frames = acc.shape[0]
+        start = int(0.20 * n_frames)
+        end = max(start + 1, int(0.90 * n_frames))
+        intensity = np.mean(acc[start:end] ** 2, axis=0)
+        pconf = ParticleConfig(
+            particle_count=particle_count,
+            seed=REFERENCE_CONFIG["particles"]["seed"],
+            dt_sec=1 / 2400,
+            density_nx=128,
+            density_ny=128,
+            gamma=2.5,
+        )
+        integration_time = max(1.5, min(float(duration_sec), 5.0))
+        steps = max(1500, min(4000, int(round(integration_time * 1000))))
+        particle_result, density_history = run_particles_on_intensity(
+            intensity, pconf, integration_time_sec=integration_time, steps=steps,
+            force_scale=0.15, damping=2.5, history_points=24
+        )
+        density_seq = np.asarray(density_history, dtype=np.float64)
+        stability = analyze_stability(
+            density_seq,
+            dt_sec=integration_time / max(1, len(density_seq) - 1),
+        )
+        sig = cymatic_signature(density_seq[-1], stability)
+        # Standard experiment metrics are derived from the actual run; no synthetic
+        # phoneme/letter values are inserted.
+        final_density = np.asarray(density_seq[-1], dtype=float)
+        disp = np.asarray(plate_seq.displacement, dtype=float)
+        acc = np.asarray(plate_seq.acceleration, dtype=float)
+        freq = np.asarray(audio.frequency_hz, dtype=float)
+        mag = np.asarray(audio.magnitude, dtype=float)
+        if mag.ndim == 2:
+            mag = np.mean(mag, axis=1)
+        peak_idx = np.argsort(mag)[-5:][::-1] if mag.size else np.array([], dtype=int)
+        acoustic_metrics = {
+            "sample_rate_hz": float(audio.sample_rate_hz),
+            "duration_sec": float(audio.duration_sec),
+            "rms": float(audio.rms),
+            "peak": float(audio.peak),
+            "clipping_fraction": float(audio.clipping_fraction),
+            "silence_fraction": float(audio.silence_fraction),
+            "dominant_frequencies_hz": [float(freq[i]) for i in peak_idx],
+        }
+        plate_metrics = {
+            "displacement_rms_model_units": float(np.sqrt(np.mean(disp**2))),
+            "displacement_peak_model_units": float(np.max(np.abs(disp))),
+            "acceleration_rms_model_units": float(np.sqrt(np.mean(acc**2))),
+            "acceleration_peak_model_units": float(np.max(np.abs(acc))),
+            "sampled_frames": int(disp.shape[0]),
+        }
+        p = np.maximum(final_density, 0.0); p = p / (p.sum() + 1e-15)
+        yy, xx = np.indices(p.shape, dtype=float)
+        pattern_metrics = {
+            "density_sum": float(final_density.sum()),
+            "density_max": float(final_density.max()) if final_density.size else 0.0,
+            "centroid_x_grid": float((xx*p).sum()),
+            "centroid_y_grid": float((yy*p).sum()),
+            "signature_dimension": int(len(sig)),
+            "formation_model": "time_averaged_intensity_gradient_drift",
+            "formation_frames_used": int(end - start),
+            "formation_integration_steps": int(steps),
+            "formation_integration_time_sec": float(integration_time),
+        }
+        D = np.asarray(stability.frame_distance, dtype=float); C = np.asarray(stability.correlation, dtype=float)
+        stability_metrics = {
+            "state": stability.state,
+            "mean_frame_distance_tail": float(np.mean(D[-10:])) if D.size else 0.0,
+            "final_frame_distance": float(D[-1]) if D.size else 0.0,
+            "mean_correlation_tail": float(np.mean(C[-10:])) if C.size else 1.0,
+            "final_correlation": float(C[-1]) if C.size else 1.0,
+            "convergence_time_sec": stability.convergence_time_sec,
+        }
+        return {
+            "mode": "real_audio_reduced_order",
+            "audio_profile": audio,
+            "modal_response": response,
+            "modal_time_series": ts,
+            "plate_sequence": plate_seq,
+            "particle_result": particle_result,
+            "density_sequence": density_seq,
+            "stability": stability,
+            "signature": sig,
+            "preprocessing": preprocessing,
+            "acoustic_metrics": acoustic_metrics,
+            "plate_metrics": plate_metrics,
+            "pattern_metrics": pattern_metrics,
+            "stability_metrics": stability_metrics,
+        }
+    finally:
+        # The preprocessed analysis WAV is temporary; always remove it even if
+        # duration checks or downstream model stages fail.
+        Path(analysis_path).unlink(missing_ok=True)
 
 
 def _status_for_real(result, wav_meta, preprocessing, particle_count):
