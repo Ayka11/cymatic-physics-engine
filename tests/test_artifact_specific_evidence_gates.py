@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
+import app.workbench as workbench
 from app.workbench import _apply_evidence_gate
 
 
@@ -129,3 +133,44 @@ def test_readiness_milestone_requires_flags_even_when_milestone_label_is_allowed
     )
     assert result["status"] == "BLOCKED"
     assert "real_mms_fa_execution_performed" in result["missing_evidence_flags"]
+
+
+
+def test_manifest_cannot_pass_when_real_upstream_files_fail_stage_gates(tmp_path, monkeypatch):
+    upstream = {
+        "MMS_FA_STATUS.json": {"status": "PASS"},
+        "ALIGNMENT_VALIDATOR_STATUS.json": {"status": "PASS"},
+        "CANDIDATE_QC_STATUS.json": {"status": "PASS"},
+        "DATASET_BUILDER_STATUS.json": {"status": "PASS"},
+        "CORPUS_BALANCE_QC_STATUS.json": {"status": "PASS"},
+    }
+    for filename, payload in upstream.items():
+        (tmp_path / filename).write_text(json.dumps(payload), encoding="utf-8")
+    monkeypatch.setattr(workbench, "RESULTS", tmp_path)
+    monkeypatch.setattr(
+        workbench,
+        "verify_manifest_integrity",
+        lambda root, manifest: {"valid": True, "status": "PASS", "issues": []},
+    )
+    manifest = {
+        "status": "PASS",
+        "fail_closed": True,
+        "failures": [],
+        "artifacts": {
+            "mms_fa_status": {"status": "PASS"},
+            "alignment_validator_status": {"status": "PASS"},
+            "candidate_qc_status": {"status": "PASS"},
+            "dataset_builder_status": {"status": "PASS"},
+            "corpus_balance_qc_status": {"status": "PASS"},
+        },
+        "reproducibility_policy": {
+            "upstream_statuses_required": ["PASS", "PASS_WITH_REVIEW"],
+        },
+    }
+    result = _apply_evidence_gate("REPRODUCIBILITY_MANIFEST_v708.json", manifest)
+    assert result["status"] == "BLOCKED"
+    assert result["evidence_gate"] == "BLOCKED"
+    assert any(
+        flag.startswith("upstream_evidence_gate:")
+        for flag in result["missing_evidence_flags"]
+    )
