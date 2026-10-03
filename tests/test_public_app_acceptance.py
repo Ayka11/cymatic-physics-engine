@@ -146,6 +146,7 @@ def test_csv_export_preserves_status_provenance_nested_fields_and_negative_numbe
         "pattern_metrics": {"formation_steps": 1500},
         "preprocessing": {"analysis_sample_rate_hz": 48000, "channels": 1},
         "physical_measurement": {"image_analysis_status": "stored_as_experimental_record_only"},
+        "modal_mode": {"requested_frequency_hz": 53.318, "nested": {"source": "reference"}},
     }
     rows = list(__import__("csv").DictReader(__import__("io").StringIO(_csv_bytes(status).decode("utf-8"))))
     values = {(row["record_group"], row["field"]): row["value"] for row in rows}
@@ -155,6 +156,8 @@ def test_csv_export_preserves_status_provenance_nested_fields_and_negative_numbe
     assert values[("acoustic_metrics", "minimum_sample")] == "-0.2"
     assert values[("preprocessing", "analysis_sample_rate_hz")] == "48000"
     assert values[("physical_measurement", "image_analysis_status")] == "stored_as_experimental_record_only"
+    assert values[("modal_mode", "requested_frequency_hz")] == "53.318"
+    assert values[("modal_mode", "nested.source")] == "reference"
 
 
 def test_csv_export_escapes_formula_like_user_strings_but_not_numeric_values():
