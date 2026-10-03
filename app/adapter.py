@@ -1,5 +1,5 @@
 from app.audio.preprocess import prepare_for_cpe
-import hashlib, json, tempfile
+import hashlib, io, json, tempfile
 from pathlib import Path
 import numpy as np
 import soundfile as sf
@@ -138,9 +138,27 @@ def validate_wav_bytes(data: bytes):
         raise ValueError("No WAV file supplied.")
     if len(data) > 50 * 1024 * 1024:
         raise ValueError("WAV file exceeds the 50 MB public limit.")
-    if data[:4] != b"RIFF" or data[8:12] != b"WAVE":
+    if len(data) < 12 or data[:4] != b"RIFF" or data[8:12] != b"WAVE":
         raise ValueError("Input must be a RIFF/WAVE file.")
-    return {"bytes": len(data), "sha256": sha256_bytes(data)}
+
+    # Check that the payload is actually decodable before accepting its hash.
+    # The later preprocessing step uses the same libsndfile decoding path.
+    try:
+        info = sf.info(io.BytesIO(data))
+    except Exception as exc:
+        raise ValueError("WAV container is invalid or unsupported.") from exc
+    if str(info.format).upper() != "WAV" or info.frames <= 0 or info.samplerate <= 0 or info.channels <= 0:
+        raise ValueError("WAV container is invalid or unsupported.")
+
+    return {
+        "bytes": len(data),
+        "sha256": sha256_bytes(data),
+        "sample_rate_hz": int(info.samplerate),
+        "channels": int(info.channels),
+        "frames": int(info.frames),
+        "duration_sec": float(info.duration),
+        "subtype": str(info.subtype or ""),
+    }
 
 
 def _plate():
