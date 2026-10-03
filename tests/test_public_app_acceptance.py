@@ -37,6 +37,15 @@ def test_public_request_limits_reject_invalid_values(duration, particles):
         validate_public_request(duration, particles)
 
 
+@pytest.mark.parametrize(
+    ("duration", "particles"),
+    [(float("nan"), 1), (float("inf"), 1), (1, 1.5), (1, float("nan")), (1, float("inf"))],
+)
+def test_public_request_limits_reject_non_finite_or_fractional_values(duration, particles):
+    with pytest.raises(ValueError):
+        validate_public_request(duration, particles)
+
+
 def test_wav_validation_rejects_empty_and_non_wav_payloads():
     with pytest.raises(ValueError, match="No WAV file supplied"):
         validate_wav_bytes(b"")
