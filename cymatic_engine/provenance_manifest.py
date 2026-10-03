@@ -104,6 +104,19 @@ def verify_manifest_integrity(root: str | Path, manifest: Mapping[str, Any]) -> 
         actual = sha256_file(candidate)
         if actual.lower() != expected_hash.lower():
             issues.append(f"{label}:sha256_mismatch")
+        if label.startswith("artifact:"):
+            try:
+                parsed = load_json(candidate)
+            except Exception:
+                issues.append(f"{label}:invalid_json")
+            else:
+                record_key = label.split(":", 1)[1]
+                record = artifacts.get(record_key) if isinstance(artifacts, Mapping) else None
+                if isinstance(record, Mapping):
+                    if parsed.get("status") != record.get("status"):
+                        issues.append(f"{label}:status_mismatch")
+                    if parsed.get("schema") != record.get("schema"):
+                        issues.append(f"{label}:schema_mismatch")
 
     artifacts = manifest.get("artifacts")
     if not isinstance(artifacts, Mapping) or not artifacts:
