@@ -22,12 +22,48 @@ def _json(x):
     return json.dumps(x, indent=2, ensure_ascii=False, default=str)
 
 
+def _apply_evidence_gate(name, data):
+    """Do not expose a readiness label when its required evidence flags are false."""
+    if not isinstance(data, dict):
+        return {"status": "BLOCKED", "file": name, "gate_reason": "Status artifact must be a JSON object."}
+
+    requirements = {
+        "REAL_CORPUS_RUN_v713_STATUS.json": (
+            "real_corpus_present",
+            "real_mms_fa_execution_performed",
+        ),
+        "SCIENTIFIC_VALIDATION_v714_STATUS.json": (
+            "real_corpus_present",
+            "real_mms_fa_execution_performed",
+            "independent_reference_present",
+            "scientific_accuracy_claim_allowed",
+        ),
+    }
+    required = requirements.get(name)
+    if not required:
+        return data
+
+    missing = [field for field in required if data.get(field) is not True]
+    result = dict(data)
+    result["declared_status"] = data.get("status", "UNKNOWN")
+    result["evidence_gate"] = "BLOCKED" if missing else "EVIDENCE_FLAGS_PRESENT"
+    if missing:
+        result["status"] = "BLOCKED"
+        result["gate_reason"] = "Required evidence flags are missing or false."
+        result["missing_evidence_flags"] = missing
+    elif str(data.get("status", "")).upper() == "BLOCKED":
+        # Evidence booleans alone must not erase an explicit blocked decision.
+        result["status"] = "BLOCKED"
+    return result
+
+
 def _status_file(name):
     p = RESULTS / name
     if not p.exists():
         return {"status": "UNAVAILABLE", "file": name}
     try:
-        return json.loads(p.read_text(encoding="utf-8"))
+        data = json.loads(p.read_text(encoding="utf-8"))
+        return _apply_evidence_gate(name, data)
     except Exception as exc:
         return {"status": "UNREADABLE", "file": name, "error": str(exc)}
 
@@ -263,6 +299,7 @@ Use **Synthetic Reference** only as a computational control. Use **Real Measurem
             with gr.Tab("📊 Analysis & Reproducibility"):
                 gr.Markdown("### Scientific status files")
                 names = [
+                    "REAL_CORPUS_RUN_v713_STATUS.json",
                     "SCIENTIFIC_VALIDATION_v714_STATUS.json",
                     "REPRODUCIBILITY_MANIFEST_v708.json",
                     "V7_09_STATUS.json",
