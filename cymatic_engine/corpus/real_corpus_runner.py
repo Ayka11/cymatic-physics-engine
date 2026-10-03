@@ -14,6 +14,27 @@ def canonical_json(x: Any) -> str:
 def sha256_text(x: str) -> str:
     return hashlib.sha256(x.encode('utf-8')).hexdigest()
 
+
+
+def resolve_input_path(value: str | Path, manifest_path: Path) -> Path:
+    """Resolve input paths relative to the repository or manifest."""
+    path = Path(value).expanduser()
+    if path.is_absolute():
+        return path.resolve()
+
+    cwd = Path.cwd().resolve()
+    manifest_dir = manifest_path.resolve().parent
+
+    roots = [cwd, *cwd.parents, manifest_dir, *manifest_dir.parents]
+    repo_root = next((root for root in roots if (root / ".git").exists()), cwd)
+
+    candidates = [repo_root / path, manifest_dir / path]
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate.resolve()
+
+    return candidates[0].resolve()
+
 def load_jsonl(path: str | Path) -> list[dict[str, Any]]:
     rows=[]
     with open(path, encoding='utf-8') as f:
@@ -24,7 +45,11 @@ def load_jsonl(path: str | Path) -> list[dict[str, Any]]:
     return rows
 
 def run_corpus(manifest_path: str | Path, output_dir: str | Path, device: str='auto') -> dict[str, Any]:
-    manifest_path=Path(manifest_path); output_dir=Path(output_dir); output_dir.mkdir(parents=True, exist_ok=True)
+    manifest_path=Path(manifest_path).expanduser().resolve()
+    output_dir=Path(output_dir).expanduser()
+    if not output_dir.is_absolute():
+        output_dir=(Path.cwd()/output_dir).resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
     items=load_jsonl(manifest_path)
     if not items:
         return {'schema':SCHEMA,'status':'BLOCKED','reason':'EMPTY_MANIFEST','items':0}
@@ -40,10 +65,26 @@ def run_corpus(manifest_path: str | Path, output_dir: str | Path, device: str='a
             map_path=item.get('phone_map_file')
             if not map_path:
                 blocked.append({'index':idx,'utterance_id':uid,'reason':'PHONE_MAP_REQUIRED'}); continue
-            maps=load_jsonl(map_path)
-            alignment=runtime.align(audio, transcript)
+            audio_path=resolve_input_path(audio, manifest_path)
+            phone_map_path=resolve_input_path(map_path, manifest_path)
+
+            if not audio_path.is_file():
+                blocked.append({
+                    'index':idx, 'utterance_id':uid,
+                    'reason':'AUDIO_FILE_NOT_FOUND', 'detail':str(audio_path),
+                })
+                continue
+            if not phone_map_path.is_file():
+                blocked.append({
+                    'index':idx, 'utterance_id':uid,
+                    'reason':'PHONE_MAP_FILE_NOT_FOUND', 'detail':str(phone_map_path),
+                })
+                continue
+
+            maps=load_jsonl(phone_map_path)
+            alignment=runtime.align(str(audio_path), transcript)
             proj=project_phone_spans(
-                utterance_id=uid, speaker_id=speaker, audio_file=str(audio),
+                utterance_id=uid, speaker_id=speaker, audio_file=str(audio_path),
                 word=str(item.get('word','')).strip() or str(item.get('normalized_word','')).strip(),
                 normalized_word=str(item.get('normalized_word','')).strip() or str(item.get('word','')).strip(),
                 char_spans=[{'char_start':r['char_start'],'char_end':r['char_end'],'start_sample':r['start_sample'],'end_sample':r['end_sample'],'confidence':r['confidence']} for r in alignment['records']],

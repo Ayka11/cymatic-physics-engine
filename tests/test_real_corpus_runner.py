@@ -21,3 +21,46 @@ def test_missing_phone_map_blocks_before_runtime(tmp_path):
         r=run_corpus(m,tmp_path/'out')
     finally: real_corpus_runner.MMSFARuntime=old
     assert r['status']=='BLOCKED' and r['blocked_items'][0]['reason']=='PHONE_MAP_REQUIRED'
+
+
+def test_partial_pass_is_not_successful_cli_status():
+    from scripts.run_real_corpus import cli_exit_code
+
+    assert cli_exit_code("PASS") == 0
+    assert cli_exit_code("PASS_WITH_BLOCKED_ITEMS") == 2
+    assert cli_exit_code("BLOCKED") == 2
+
+
+def test_relative_input_path_resolves_from_repository_root(tmp_path, monkeypatch):
+    from cymatic_engine.corpus.real_corpus_runner import resolve_input_path
+
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    (repo / "assets").mkdir()
+    manifest_dir = repo / "manifests"
+    manifest_dir.mkdir()
+    audio = repo / "assets" / "sample.wav"
+    audio.write_bytes(b"test")
+    manifest = manifest_dir / "manifest.jsonl"
+    manifest.write_text("", encoding="utf-8")
+
+    monkeypatch.chdir(repo)
+    resolved = resolve_input_path("assets/sample.wav", manifest.resolve())
+
+    assert resolved == audio.resolve()
+
+
+def test_missing_relative_input_returns_deterministic_path(tmp_path, monkeypatch):
+    from cymatic_engine.corpus.real_corpus_runner import resolve_input_path
+
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    manifest_dir = repo / "manifests"
+    manifest_dir.mkdir()
+    manifest = manifest_dir / "manifest.jsonl"
+    manifest.write_text("", encoding="utf-8")
+
+    monkeypatch.chdir(repo)
+    resolved = resolve_input_path("missing/audio.wav", manifest.resolve())
+
+    assert resolved == (repo / "missing" / "audio.wav").resolve()
