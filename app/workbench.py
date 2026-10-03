@@ -37,13 +37,22 @@ def _apply_evidence_gate(name, data):
             "independent_reference_present", "scientific_accuracy_claim_allowed",
         ),
         "V7_09_STATUS.json": (
-            "real_mms_fa_execution_available_in_package", "benchmark_result_emitted",
+            "real_mms_fa_execution_available_in_package", "real_mms_fa_execution_performed",
+            "benchmark_result_emitted", "v707_pass", "v708_manifest_pass",
+            "independent_deterministic_rerun_pass",
         ),
         "DATASET_BUILDER_STATUS.json": (
-            "real_mms_fa_execution_available_in_package", "dataset_emitted",
+            "real_mms_fa_execution_available_in_package", "real_mms_fa_execution_performed",
+            "upstream_candidate_qc_pass", "dataset_emitted",
         ),
-        "CANDIDATE_QC_STATUS.json": ("real_mms_fa_execution_available_in_package",),
-        "ALIGNMENT_VALIDATOR_STATUS.json": ("fail_closed",),
+        "CANDIDATE_QC_STATUS.json": (
+            "real_mms_fa_execution_available_in_package", "real_mms_fa_execution_performed",
+            "alignment_output_present", "candidate_qc_executed", "selection_emitted",
+        ),
+        "ALIGNMENT_VALIDATOR_STATUS.json": (
+            "fail_closed", "real_mms_fa_execution_performed",
+            "alignment_output_present", "validation_executed", "validation_result_emitted",
+        ),
         "MMS_FA_STATUS.json": ("model_weights_available", "model_execution_performed"),
     }
     result = dict(data)
@@ -84,15 +93,24 @@ def _apply_evidence_gate(name, data):
             result["missing_evidence_flags"] = missing
         return result
 
-    # Corpus balance has no single boolean that proves QC ran; keep its explicit
-    # blocked state above and require an explicit PASS/PASS_WITH_REVIEW result.
-    gated_names = set(requirements) | {"CORPUS_BALANCE_QC_STATUS.json"}
+    # A corpus-balance report needs an actual input dataset and an emitted QC result.
+    requirements["CORPUS_BALANCE_QC_STATUS.json"] = (
+        "dataset_present", "qc_executed", "qc_report_emitted",
+    )
+    gated_names = set(requirements)
     if name not in gated_names:
         return result
 
     required = requirements.get(name, ())
     missing = [field for field in required if data.get(field) is not True]
-    passing_status = declared_status in {"PASS", "PASS_WITH_REVIEW"}
+    # Readiness milestones retain their own valid labels, but the release-pipeline
+    # artifacts must explicitly pass their stage-specific checks.
+    allowed_statuses = {
+        "REAL_CORPUS_RUN_v713_STATUS.json": {"PASS", "PASS_WITH_REVIEW", "READY_FOR_REAL_CORPUS"},
+        "SCIENTIFIC_VALIDATION_v714_STATUS.json": {"PASS", "PASS_WITH_REVIEW", "COMPLETE"},
+    }
+    accepted_statuses = allowed_statuses.get(name, {"PASS", "PASS_WITH_REVIEW"})
+    passing_status = declared_status in accepted_statuses
     if not passing_status:
         missing.append("status:PASS_or_PASS_WITH_REVIEW")
 
