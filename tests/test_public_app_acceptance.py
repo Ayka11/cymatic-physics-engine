@@ -131,6 +131,48 @@ def test_report_and_csv_exports_include_status_and_metric_values():
     assert "TEST-001" in csv_text
 
 
+def test_csv_export_preserves_status_provenance_nested_fields_and_negative_numbers():
+    status = {
+        "experiment_id": "REAL-002",
+        "grapheme": "мама",
+        "phoneme_ipa": "",
+        "scientific_status": "COMPUTED_REDUCED_ORDER_MODEL",
+        "audio_status": "processed_real_wav",
+        "empirical_force_calibration": False,
+        "source_audio_sha256": "source-digest",
+        "analysis_audio_sha256": "analysis-digest",
+        "warning": "not a measured physical response",
+        "acoustic_metrics": {"duration_sec": 0.5, "minimum_sample": -0.2},
+        "pattern_metrics": {"formation_steps": 1500},
+        "preprocessing": {"analysis_sample_rate_hz": 48000, "channels": 1},
+        "physical_measurement": {"image_analysis_status": "stored_as_experimental_record_only"},
+    }
+    rows = list(__import__("csv").DictReader(__import__("io").StringIO(_csv_bytes(status).decode("utf-8"))))
+    values = {(row["record_group"], row["field"]): row["value"] for row in rows}
+    assert values[("experiment_metadata", "scientific_status")] == "COMPUTED_REDUCED_ORDER_MODEL"
+    assert values[("experiment_metadata", "source_audio_sha256")] == "source-digest"
+    assert values[("experiment_metadata", "empirical_force_calibration")] == "false"
+    assert values[("acoustic_metrics", "minimum_sample")] == "-0.2"
+    assert values[("preprocessing", "analysis_sample_rate_hz")] == "48000"
+    assert values[("physical_measurement", "image_analysis_status")] == "stored_as_experimental_record_only"
+
+
+def test_csv_export_escapes_formula_like_user_strings_but_not_numeric_values():
+    status = {
+        "experiment_id": "CSV-SAFETY",
+        "grapheme": "=HYPERLINK(\\"https://example.invalid\\")",
+        "phoneme_ipa": "",
+        "scientific_status": "COMPUTED_TEST",
+        "acoustic_metrics": {"negative_measurement": -1.25},
+    }
+    text = _csv_bytes(status).decode("utf-8")
+    rows = list(__import__("csv").DictReader(__import__("io").StringIO(text)))
+    metadata = next(row for row in rows if row["field"] == "grapheme")
+    negative = next(row for row in rows if row["field"] == "negative_measurement")
+    assert metadata["value"].startswith("'=")
+    assert negative["value"] == "-1.25"
+
+
 def test_full_public_app_builds_with_registered_event_handlers():
     demo = build_app()
     try:
