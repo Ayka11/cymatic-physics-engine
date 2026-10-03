@@ -23,37 +23,84 @@ def _json(x):
 
 
 def _apply_evidence_gate(name, data):
-    """Do not expose a readiness label when its required evidence flags are false."""
+    """Apply artifact-specific fail-closed evidence rules without conflating implementation and evidence."""
     if not isinstance(data, dict):
-        return {"status": "BLOCKED", "file": name, "gate_reason": "Status artifact must be a JSON object."}
+        return {"status": "BLOCKED", "file": name, "evidence_gate": "BLOCKED",
+                "gate_reason": "Status artifact must be a JSON object."}
 
     requirements = {
         "REAL_CORPUS_RUN_v713_STATUS.json": (
-            "real_corpus_present",
-            "real_mms_fa_execution_performed",
+            "real_corpus_present", "real_mms_fa_execution_performed",
         ),
         "SCIENTIFIC_VALIDATION_v714_STATUS.json": (
-            "real_corpus_present",
-            "real_mms_fa_execution_performed",
-            "independent_reference_present",
-            "scientific_accuracy_claim_allowed",
+            "real_corpus_present", "real_mms_fa_execution_performed",
+            "independent_reference_present", "scientific_accuracy_claim_allowed",
         ),
+        "V7_09_STATUS.json": (
+            "real_mms_fa_execution_available_in_package", "benchmark_result_emitted",
+        ),
+        "DATASET_BUILDER_STATUS.json": (
+            "real_mms_fa_execution_available_in_package", "dataset_emitted",
+        ),
+        "CANDIDATE_QC_STATUS.json": ("real_mms_fa_execution_available_in_package",),
+        "ALIGNMENT_VALIDATOR_STATUS.json": ("fail_closed",),
+        "MMS_FA_STATUS.json": ("model_weights_available", "model_execution_performed"),
     }
-    required = requirements.get(name)
-    if not required:
-        return data
-
-    missing = [field for field in required if data.get(field) is not True]
     result = dict(data)
+    declared_status = str(data.get("status", "UNKNOWN")).upper()
     result["declared_status"] = data.get("status", "UNKNOWN")
+
+    # An explicit BLOCKED state is never promoted by UI-level checks.
+    if declared_status == "BLOCKED":
+        result["status"] = "BLOCKED"
+        result["evidence_gate"] = "BLOCKED"
+        result.setdefault("gate_reason", "Artifact explicitly declares BLOCKED.")
+        return result
+
+    # A reproducibility manifest must remain blocked when it declares failures,
+    # even if its top-level status is edited inconsistently.
+    if name == "REPRODUCIBILITY_MANIFEST_v708.json":
+        failures = data.get("failures")
+        policy = data.get("reproducibility_policy")
+        required_statuses = policy.get("upstream_statuses_required", ["PASS", "PASS_WITH_REVIEW"]) if isinstance(policy, dict) else ["PASS", "PASS_WITH_REVIEW"]
+        artifact_statuses = data.get("artifacts", {})
+        bad_upstream = []
+        if isinstance(artifact_statuses, dict):
+            for key, artifact in artifact_statuses.items():
+                if not isinstance(artifact, dict) or str(artifact.get("status", "UNKNOWN")).upper() not in required_statuses:
+                    bad_upstream.append(key)
+        missing = []
+        if data.get("fail_closed") is not True:
+            missing.append("fail_closed")
+        if not isinstance(failures, list) or failures:
+            missing.append("failures_empty")
+        if bad_upstream:
+            missing.extend("upstream_pass:" + key for key in bad_upstream)
+        blocked = bool(missing)
+        result["status"] = "BLOCKED" if blocked else declared_status
+        result["evidence_gate"] = "BLOCKED" if blocked else "EVIDENCE_FLAGS_PRESENT"
+        if blocked:
+            result["gate_reason"] = "Manifest contains failures or upstream artifacts that are not PASS/PASS_WITH_REVIEW."
+            result["missing_evidence_flags"] = missing
+        return result
+
+    # Corpus balance has no single boolean that proves QC ran; keep its explicit
+    # blocked state above and require an explicit PASS/PASS_WITH_REVIEW result.
+    gated_names = set(requirements) | {"CORPUS_BALANCE_QC_STATUS.json"}
+    if name not in gated_names:
+        return result
+
+    required = requirements.get(name, ())
+    missing = [field for field in required if data.get(field) is not True]
+    passing_status = declared_status in {"PASS", "PASS_WITH_REVIEW"}
+    if not passing_status:
+        missing.append("status:PASS_or_PASS_WITH_REVIEW")
+
     result["evidence_gate"] = "BLOCKED" if missing else "EVIDENCE_FLAGS_PRESENT"
     if missing:
         result["status"] = "BLOCKED"
-        result["gate_reason"] = "Required evidence flags are missing or false."
+        result["gate_reason"] = "Required evidence or a passing artifact status is missing."
         result["missing_evidence_flags"] = missing
-    elif str(data.get("status", "")).upper() == "BLOCKED":
-        # Evidence booleans alone must not erase an explicit blocked decision.
-        result["status"] = "BLOCKED"
     return result
 
 
