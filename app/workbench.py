@@ -79,6 +79,28 @@ def _apply_evidence_gate(name, data):
             for key, artifact in artifact_statuses.items():
                 if not isinstance(artifact, dict) or str(artifact.get("status", "UNKNOWN")).upper() not in required_statuses:
                     bad_upstream.append(key)
+
+        # Do not trust PASS labels copied into the manifest alone. Re-apply each
+        # upstream artifact's stage-specific evidence gate to the actual file.
+        upstream_files = {
+            "mms_fa_status": "MMS_FA_STATUS.json",
+            "alignment_validator_status": "ALIGNMENT_VALIDATOR_STATUS.json",
+            "candidate_qc_status": "CANDIDATE_QC_STATUS.json",
+            "dataset_builder_status": "DATASET_BUILDER_STATUS.json",
+            "corpus_balance_qc_status": "CORPUS_BALANCE_QC_STATUS.json",
+        }
+        upstream_evidence_failures = []
+        for key, filename in upstream_files.items():
+            path = RESULTS / filename
+            try:
+                actual_data = json.loads(path.read_text(encoding="utf-8"))
+            except Exception:
+                upstream_evidence_failures.append(key)
+                continue
+            gated = _apply_evidence_gate(filename, actual_data)
+            if str(gated.get("status", "UNKNOWN")).upper() not in required_statuses:
+                upstream_evidence_failures.append(key)
+
         missing = []
         if data.get("fail_closed") is not True:
             missing.append("fail_closed")
@@ -86,6 +108,8 @@ def _apply_evidence_gate(name, data):
             missing.append("failures_empty")
         if bad_upstream:
             missing.extend("upstream_pass:" + key for key in bad_upstream)
+        if upstream_evidence_failures:
+            missing.extend("upstream_evidence_gate:" + key for key in upstream_evidence_failures)
         if declared_status not in required_statuses:
             missing.append("status:PASS_or_PASS_WITH_REVIEW")
         integrity = verify_manifest_integrity(ROOT, data)
