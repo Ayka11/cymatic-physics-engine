@@ -2,6 +2,8 @@
 from pathlib import Path
 import json
 
+from app.workbench import _apply_evidence_gate
+
 
 @dataclass(frozen=True)
 class ResearchGateStatus:
@@ -48,17 +50,27 @@ class ScientificResearchController:
                 )
                 continue
 
+            # Reuse the same fail-closed evidence gate as the primary
+            # research UI so this secondary panel cannot expose an ungated
+            # READY/COMPLETE status from a status artifact.
+            data = _apply_evidence_gate(filename, data)
             status = str(
                 data.get("status")
                 or data.get("release_status")
                 or "UNKNOWN"
             )
+            detail = f"Read from {filename}"
+            if data.get("gate_reason"):
+                detail += f"; {data['gate_reason']}"
+            missing = data.get("missing_evidence_flags")
+            if missing:
+                detail += " Missing flags: " + ", ".join(missing)
 
             output.append(
                 ResearchGateStatus(
                     name=name,
                     status=status,
-                    detail=f"Read from {filename}",
+                    detail=detail,
                 )
             )
 
