@@ -202,3 +202,78 @@ def test_pure_tone_temporary_wav_is_removed_when_model_fails(monkeypatch):
 
     assert len(generated_paths) == 1
     assert not Path(generated_paths[0]).exists()
+
+
+
+def _write_test_sine_wav(path: Path, sample_rate: int = 48000, duration_sec: float = 0.5):
+    sample_index = np.arange(int(sample_rate * duration_sec), dtype=np.float64)
+    samples = (0.2 * np.sin(2 * np.pi * 440 * sample_index / sample_rate)).astype(np.float32)
+    sf.write(path, samples, sample_rate, subtype="PCM_16")
+    return path
+
+
+def test_real_wav_runs_end_to_end_and_preserves_scientific_limits(tmp_path):
+    source = _write_test_sine_wav(tmp_path / "real_audio.wav")
+    result, status = run_public_demo(
+        wav_path=str(source),
+        duration_sec=0.1,
+        particle_count=64,
+        grapheme="",
+        phoneme_ipa="",
+        locale="en",
+        input_mode="Real audio / speech",
+    )
+
+    assert result["mode"] == "real_audio_reduced_order"
+    assert status["scientific_status"] == "COMPUTED_REDUCED_ORDER_MODEL"
+    assert status["audio_status"] == "processed_real_wav"
+    assert status["source_audio_sha256"] == __import__("hashlib").sha256(source.read_bytes()).hexdigest()
+    assert status["analysis_audio_sha256"]
+    assert status["preprocessing"]["analysis_sample_rate_hz"] == 48000
+    assert status["preprocessing"]["analysis_channels"] == 1
+    assert status["empirical_force_calibration"] is False
+    assert "not a measured physical response" in status["warning"]
+    assert status["acoustic_metrics"]["duration_sec"] == pytest.approx(0.5, abs=1 / 48000)
+    assert status["pattern_metrics"]["formation_integration_steps"] >= 1500
+
+
+def test_preprocessed_wav_is_removed_when_real_audio_is_too_short(tmp_path, monkeypatch):
+    source = _write_test_sine_wav(tmp_path / "short_audio.wav", duration_sec=0.2)
+    original_prepare = adapter_module.prepare_for_cpe
+    prepared_paths = []
+
+    def tracked_prepare(*args, **kwargs):
+        path, info, provenance = original_prepare(*args, **kwargs)
+        prepared_paths.append(path)
+        return path, info, provenance
+
+    monkeypatch.setattr(adapter_module, "prepare_for_cpe", tracked_prepare)
+
+    with pytest.raises(ValueError, match="shorter than requested"):
+        run_public_demo(
+            wav_path=str(source),
+            duration_sec=0.4,
+            particle_count=64,
+            input_mode="Real audio / speech",
+        )
+
+    assert len(prepared_paths) == 1
+    assert not Path(prepared_paths[0]).exists()
+
+
+def test_malformed_wav_is_rejected_before_real_audio_pipeline(tmp_path, monkeypatch):
+    malformed = tmp_path / "malformed.wav"
+    malformed.write_bytes(b"RIFF" + bytes(4) + b"WAVE")
+    called = False
+
+    def forbidden_pipeline(*args, **kwargs):
+        nonlocal called
+        called = True
+        raise AssertionError("real audio pipeline must not run for malformed WAV")
+
+    monkeypatch.setattr(adapter_module, "_real_audio_run", forbidden_pipeline)
+
+    with pytest.raises(ValueError, match="invalid or unsupported"):
+        run_public_demo(wav_path=str(malformed), duration_sec=0.1, particle_count=64)
+
+    assert called is False
