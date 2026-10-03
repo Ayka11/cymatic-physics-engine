@@ -20,7 +20,7 @@ def gaussian_coupling(plate, m, n, x0=0.073, y0=0.119, sigma=0.008, nx=256, ny=2
     X, Y = np.meshgrid(x, y, indexing="xy")
     g = np.exp(-((X-x0)**2 + (Y-y0)**2)/(2*sigma**2))
     phi = np.sin(m*np.pi*X/plate.length_x_m)*np.sin(n*np.pi*Y/plate.length_y_m)
-    return float(np.trapezoid(np.trapezoid(g*phi, x, axis=1), y, axis=0))
+    return float(np.trapz(np.trapz(g*phi, x, axis=1), y, axis=0))
 
 
 def prescribed_audio_modal_response(audio: AudioProfile, plate: PlateModel,

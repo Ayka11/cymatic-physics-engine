@@ -1,5 +1,5 @@
 from __future__ import annotations
-import hashlib, json
+import hashlib, json, re
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping
 
@@ -68,27 +68,115 @@ def project_phone_spans(
     transcript character span(s) support each phone. Ambiguous or uncovered
     mappings are rejected instead of guessed.
     """
-    spans = _validate_char_spans(char_spans)
-    mappings = list(phone_map)
+    if not isinstance(source_alignment, Mapping):
+        return {
+            "schema": SCHEMA, "status": "BLOCKED",
+            "reason": "SOURCE_ALIGNMENT_INVALID", "phones": [],
+        }
+    try:
+        spans = _validate_char_spans(char_spans)
+        mappings = list(phone_map)
+    except (TypeError, ValueError, KeyError, AttributeError) as exc:
+        return {
+            "schema": SCHEMA, "status": "BLOCKED",
+            "reason": "PROJECTION_INPUT_INVALID",
+            "detail": str(exc), "phones": [],
+        }
+    if any(not isinstance(m, Mapping) for m in mappings):
+        return {
+            "schema": SCHEMA, "status": "BLOCKED",
+            "reason": "PHONE_MAP_INVALID",
+            "errors": ["map_entry_not_object"], "phones": [],
+        }
     errors: list[str] = []
     phones: list[dict[str, Any]] = []
+
+    # Provenance is mandatory: never emit PASS with missing or malformed hashes.
+    provenance_fields = (
+        "audio_sha256", "transcript_sha256", "model_id", "model_version"
+    )
+    missing_provenance = [
+        field for field in provenance_fields
+        if not str(source_alignment.get(field, "")).strip()
+    ]
+    if missing_provenance:
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "reason": "SOURCE_ALIGNMENT_PROVENANCE_REQUIRED",
+            "missing": missing_provenance,
+            "phones": [],
+        }
+
+    for hash_field in ("audio_sha256", "transcript_sha256"):
+        if not re.fullmatch(r"[0-9a-fA-F]{64}", str(source_alignment[hash_field])):
+            return {
+                "schema": SCHEMA,
+                "status": "BLOCKED",
+                "reason": "SOURCE_ALIGNMENT_PROVENANCE_INVALID",
+                "field": hash_field,
+                "phones": [],
+            }
+
+    raw_transcript = source_alignment.get("transcript_raw")
+    normalized_transcript = source_alignment.get("transcript_normalized")
+    if not isinstance(raw_transcript, str) or not isinstance(normalized_transcript, str) or not normalized_transcript:
+        return {
+            "schema": SCHEMA, "status": "BLOCKED",
+            "reason": "SOURCE_ALIGNMENT_TRANSCRIPT_REQUIRED", "phones": [],
+        }
+
+    expected_transcript_hash = hashlib.sha256(
+        raw_transcript.encode("utf-8")
+    ).hexdigest()
+    if expected_transcript_hash.lower() != str(source_alignment["transcript_sha256"]).lower():
+        return {
+            "schema": SCHEMA, "status": "BLOCKED",
+            "reason": "SOURCE_ALIGNMENT_TRANSCRIPT_HASH_MISMATCH", "phones": [],
+        }
+
+    if any(span.char_end > len(normalized_transcript) for span in spans):
+        return {
+            "schema": SCHEMA, "status": "BLOCKED",
+            "reason": "CHARACTER_SPAN_OUT_OF_BOUNDS", "phones": [],
+        }
 
     if not mappings:
         return {"schema": SCHEMA, "status": "BLOCKED", "reason": "PHONE_MAP_REQUIRED", "phones": []}
 
     for i, m in enumerate(mappings):
-        for key in ("phone", "source_char_start", "source_char_end"):
+        for key in ("phone", "source_char_start", "source_char_end", "mapping_source"):
             if key not in m:
                 errors.append(f"map_{i}:missing_{key}")
         if errors and errors[-1].startswith(f"map_{i}:"):
+            continue
+        if not str(m["mapping_source"]).strip():
+            errors.append(f"map_{i}:empty_mapping_source")
             continue
         phone = normalize_phone(m["phone"])
         if phone not in CANONICAL_34_PHONES:
             errors.append(f"map_{i}:unknown_phone:{phone}")
             continue
-        c0, c1 = int(m["source_char_start"]), int(m["source_char_end"])
+        try:
+            raw_c0, raw_c1 = m["source_char_start"], m["source_char_end"]
+            if isinstance(raw_c0, bool) or isinstance(raw_c1, bool):
+                raise ValueError("boolean index")
+            c0, c1 = int(raw_c0), int(raw_c1)
+            if str(c0) != str(raw_c0).strip() or str(c1) != str(raw_c1).strip():
+                # Accept integer values, including JSON integers, but reject
+                # fractional numeric strings and silently truncated floats.
+                if not (isinstance(raw_c0, int) and isinstance(raw_c1, int)):
+                    raise ValueError("non-integral index")
+        except (TypeError, ValueError, OverflowError):
+            errors.append(f"map_{i}:invalid_char_span")
+            continue
         if c0 < 0 or c1 <= c0:
             errors.append(f"map_{i}:invalid_char_span")
+            continue
+        if c1 > len(normalized_transcript):
+            errors.append(
+                f"map_{i}:char_span_out_of_bounds:{c0}:{c1}:{len(normalized_transcript)}"
+            )
             continue
         covered = [s for s in spans if s.char_start >= c0 and s.char_end <= c1]
         if not covered:
@@ -111,7 +199,7 @@ def project_phone_spans(
             "end_sample": end,
             "confidence": confidence,
             "mapping_method": m.get("mapping_method", "external_explicit_map"),
-            "mapping_source": m.get("mapping_source", "unspecified"),
+            "mapping_source": str(m["mapping_source"]).strip(),
             "source_alignment_schema": source_alignment.get("schema", "MMS_FA_ALIGNMENT"),
             "audio_sha256": source_alignment.get("audio_sha256"),
             "transcript_sha256": source_alignment.get("transcript_sha256"),
@@ -121,6 +209,23 @@ def project_phone_spans(
 
     if errors:
         return {"schema": SCHEMA, "status": "BLOCKED", "reason": "PHONE_MAP_INVALID", "errors": errors, "phones": []}
+
+    for span in spans:
+        covered_by_map = any(
+            int(m["source_char_start"]) <= span.char_start
+            and int(m["source_char_end"]) >= span.char_end
+            for m in mappings
+        )
+        if not covered_by_map:
+            errors.append(
+                f"UNMAPPED_CHARACTER_ALIGNMENT_SPAN:{span.char_start}:{span.char_end}"
+            )
+    if errors:
+        return {
+            "schema": SCHEMA, "status": "BLOCKED",
+            "reason": "UNMAPPED_CHARACTER_ALIGNMENT_SPAN",
+            "errors": errors, "phones": [],
+        }
 
     phones.sort(key=lambda r: (r["start_sample"], r["end_sample"], r["phone_normalized"]))
     for a, b in zip(phones, phones[1:]):

@@ -34,15 +34,29 @@ def normalize_mms_text(text: str) -> str:
 
 
 def load_audio_16k(path: str | Path):
-    waveform, sr = torchaudio.load(str(path))
-    if waveform.ndim != 2:
-        raise ValueError("audio must be [channels, time]")
+    """Load audio through soundfile, then resample to the MMS_FA rate."""
+    import soundfile as sf
+
+    audio, sr = sf.read(str(path), dtype="float32", always_2d=True)
+    waveform = torch.from_numpy(audio.T.copy())
+
     if waveform.shape[0] > 1:
         waveform = waveform.mean(dim=0, keepdim=True)
+
     if sr != MMS_SAMPLE_RATE:
-        waveform = torchaudio.functional.resample(waveform, sr, MMS_SAMPLE_RATE)
+        waveform = torchaudio.functional.resample(
+            waveform, orig_freq=sr, new_freq=MMS_SAMPLE_RATE
+        )
         sr = MMS_SAMPLE_RATE
-    return waveform, sr
+
+    if waveform.ndim != 2 or waveform.shape[0] != 1:
+        raise ValueError(
+            f"Expected mono [1, samples] waveform, got {tuple(waveform.shape)}"
+        )
+    if waveform.shape[-1] == 0:
+        raise ValueError("Audio file contains no samples")
+
+    return waveform.contiguous(), sr
 
 
 class MMSFARuntime:

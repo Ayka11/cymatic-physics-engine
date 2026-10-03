@@ -42,6 +42,16 @@ jobs:
         run: python -m compileall -q app cymatic_engine cpe_hfr02 tests
       - name: Run full test suite
         run: python -m pytest -q
+      - name: Run HFR09 asset integrity audit (deferred issue)
+        run: python scripts/run_hfr09_integrity_audit.py
+        continue-on-error: true
+      - name: Upload HFR09 integrity report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hfr09-integrity-audit
+          path: results/E103_HFR09_INTEGRITY_AUDIT.json
+          if-no-files-found: warn
       - name: Construct and serve Gradio app smoke test
         run: |
           python - <<'PY'

@@ -1,8 +1,12 @@
 {
-  "status": "BLOCKED",
+  "status": "PASS_WITH_REVIEW",
   "model": "MMS_FA",
-  "model_weights_available": false,
-  "model_execution_performed": false,
-  "reason": "MMS_FA_model_weights_not_available",
-  "scientific_evidence_level_maximum": "E1"
+  "model_weights_available": true,
+  "model_execution_performed": true,
+  "reason": "Single-utterance runtime smoke test passed; full-corpus scientific validation remains incomplete.",
+  "scientific_evidence_level_maximum": "E1",
+  "runtime_smoke_test_status": "PASS",
+  "runtime_smoke_test_evidence": "results/MMS_FA_RUNTIME_SMOKE_TEST.json",
+  "real_corpus_run": false,
+  "phone_projection_validated": false
 }
