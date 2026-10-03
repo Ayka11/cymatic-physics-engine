@@ -103,24 +103,20 @@ def build_end_to_end_record(
         "evidence",
     )
 
-    # Fail closed: no automatic promotion to E5.
-    if validated_evidence_level is None:
-        evidence = "E0"
-        status = (
-            "PHYSICAL_VALIDATION_PASSED_EVIDENCE_GATE_PENDING"
-            if pv["passed"]
-            else "PARTIAL_PHYSICAL_VALIDATION"
-        )
-    else:
-        evidence = str(validated_evidence_level)
-        if pv["passed"]:
-            status = "PHYSICALLY_VALIDATED"
-        else:
-            # A failed PV result can never be promoted by an evidence-level
-            # argument.
-            evidence = "E0"
-            status = "PARTIAL_PHYSICAL_VALIDATION"
-
+    # A caller-supplied label is not proof that an independent evidence
+    # gate was satisfied. Until a verifiable evidence-gate record is accepted
+    # here, keep the record at E0 even when supplied metrics pass thresholds.
+    evidence = "E0"
+    status = (
+        "PHYSICAL_VALIDATION_PASSED_EVIDENCE_GATE_PENDING"
+        if pv["passed"]
+        else "PARTIAL_PHYSICAL_VALIDATION"
+    )
+    requested_evidence = (
+        str(validated_evidence_level)
+        if validated_evidence_level is not None
+        else None
+    )
     record = {
         "schema_version": "2.5.0",
         "source_hash": str(source_hash),
@@ -132,8 +128,11 @@ def build_end_to_end_record(
         "stages": stages,
         "scientific_status": status,
         "evidence_level": evidence,
+        "requested_evidence_level": requested_evidence,
+        "evidence_promotion_blocked": requested_evidence is not None,
         "claim_guard": {
-            "real_physical_chain_claim": bool(pv["passed"]),
+            "real_physical_chain_claim": False,
+            "supplied_metrics_thresholds_passed": bool(pv["passed"]),
             "phoneme_identity_claim": False,
             "glyph_identity_claim": False,
             "automatic_e5_promotion": False,
