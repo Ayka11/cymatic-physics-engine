@@ -103,7 +103,7 @@ def _csv_value(value):
 
 
 def _csv_bytes(status):
-    """Export scalar experiment metadata, provenance, and every metric group."""
+    """Export every status field, recursively preserving nested provenance and metrics."""
     output = io.StringIO(newline="")
     writer = csv.writer(output)
     writer.writerow(["experiment_id", "grapheme", "phoneme_ipa", "record_group", "field", "value"])
@@ -112,30 +112,38 @@ def _csv_bytes(status):
         status.get("grapheme", ""),
         status.get("phoneme_ipa", ""),
     ]
-    metric_groups = {
-        "acoustic_metrics", "plate_metrics", "pattern_metrics", "stability_metrics",
-        "physical_measurement", "preprocessing", "generated_test_signal",
-    }
 
-    # Preserve all top-level scalar fields, including scientific status,
-    # warnings, calibration flags, and provenance hashes.
+    def emit(group, field, value):
+        writer.writerow([
+            *map(_csv_safe, identity),
+            _csv_safe(str(group)),
+            _csv_safe(str(field)),
+            _csv_safe(_csv_value(value)),
+        ])
+
+    def flatten(group, value, prefix=""):
+        if isinstance(value, dict):
+            if not value:
+                emit(group, prefix or "_value", value)
+            else:
+                for key, nested in value.items():
+                    child = f"{prefix}.{key}" if prefix else str(key)
+                    flatten(group, nested, child)
+        elif isinstance(value, (list, tuple)):
+            emit(group, prefix or "_value", value)
+        else:
+            emit(group, prefix or "_value", value)
+
+    # Keep identity/status/provenance scalars and recursively export every
+    # structured field, including future fields not known to this UI version.
     for key, value in status.items():
-        if key in metric_groups or isinstance(value, (dict, list, tuple)):
-            continue
-        writer.writerow([*map(_csv_safe, identity), "experiment_metadata", _csv_safe(key), _csv_safe(_csv_value(value))])
-
-    for group in (
-        "acoustic_metrics", "plate_metrics", "pattern_metrics", "stability_metrics",
-        "physical_measurement", "preprocessing", "generated_test_signal",
-    ):
-        values = status.get(group, {})
-        if not isinstance(values, dict):
-            writer.writerow([*map(_csv_safe, identity), group, "_value", _csv_safe(_csv_value(values))])
-            continue
-        for key, value in values.items():
-            writer.writerow([*map(_csv_safe, identity), _csv_safe(group), _csv_safe(str(key)), _csv_safe(_csv_value(value))])
+        if isinstance(value, dict):
+            flatten(key, value)
+        elif isinstance(value, (list, tuple)):
+            emit(key, "_value", value)
+        else:
+            emit("experiment_metadata", key, value)
     return output.getvalue().encode("utf-8")
-
 
 def _generate_tone(frequency_label, duration, amplitude):
     try:
