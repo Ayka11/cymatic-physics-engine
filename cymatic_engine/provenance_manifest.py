@@ -178,3 +178,51 @@ def verify_manifest_integrity(root: str | Path, manifest: Mapping[str, Any]) -> 
         "status": "PASS" if not issues else "BLOCKED",
         "issues": issues,
     }
+
+def main(argv: list[str] | None = None) -> int:
+    """Build and verify the current manifest without promoting blocked evidence."""
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Build the CPE v7.08 reproducibility manifest.")
+    parser.add_argument(
+        "--root",
+        type=Path,
+        default=Path(__file__).resolve().parents[1],
+        help="Repository root (defaults to the root containing this package).",
+    )
+    parser.add_argument(
+        "--output",
+        default="results/REPRODUCIBILITY_MANIFEST_v708.json",
+        help="Output path, absolute or relative to --root.",
+    )
+    args = parser.parse_args(argv)
+
+    root = args.root.resolve()
+    output = Path(args.output)
+    if not output.is_absolute():
+        output = root / output
+
+    manifest = build_manifest(root)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2) + "\\n",
+        encoding="utf-8",
+    )
+    integrity = verify_manifest_integrity(root, manifest)
+
+    print(f"manifest_status={manifest.get('status', 'BLOCKED')}")
+    print(f"integrity_status={integrity['status']}")
+    print(f"manifest_path={output}")
+    for failure in manifest.get("failures", []):
+        print(f"evidence_failure={failure}")
+    for issue in integrity["issues"]:
+        print(f"integrity_issue={issue}")
+
+    # Exit status describes whether the manifest is internally verifiable.
+    # Scientific readiness remains explicit in manifest_status and is never
+    # promoted by a successful file-generation operation.
+    return 0 if integrity["valid"] else 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
