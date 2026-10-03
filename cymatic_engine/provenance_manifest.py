@@ -144,7 +144,7 @@ def verify_manifest_integrity(root: str | Path, manifest: Mapping[str, Any]) -> 
 
     source_hashes = manifest.get("source_hashes")
     expected_sources = {
-        str(p.relative_to(root)).replace("\\\\", "/")
+        str(p.relative_to(root)).replace("\\", "/")
         for pattern in ("config/*.json", "cymatic_engine/**/*.py")
         for p in root.glob(pattern)
         if p.is_file()
@@ -161,7 +161,7 @@ def verify_manifest_integrity(root: str | Path, manifest: Mapping[str, Any]) -> 
             verify_recorded_file(f"source:{rel_path}", rel_path, expected_hash)
 
     expected_chain = manifest.get("chain_sha256")
-    if not isinstance(expected_chain, str) or len(expected_chain) != 64:
+    if not isinstance(expected_chain, str) or re.fullmatch(r"[0-9a-fA-F]{64}", expected_chain) is None:
         issues.append("chain_sha256:missing_or_invalid")
     else:
         # build_manifest computes the chain before appending these two metadata fields.
