@@ -54,8 +54,8 @@ def build_manifest(root: str | Path, *, strict: bool = True) -> dict[str, Any]:
         tracked.append(p)
     for p in sorted(root.glob("cymatic_engine/**/*.py")):
         tracked.append(p)
-        str(p.relative_to(root)).replace("\\", "/")
 
+    source_hashes = {str(p.relative_to(root)).replace("\\", "/"): sha256_file(p) for p in tracked}
     failures=[]
     statuses={k:v.get("status") for k,v in artifacts.items()}
     if missing: failures.append("missing_required_artifacts")
