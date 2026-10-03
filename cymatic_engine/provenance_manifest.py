@@ -79,3 +79,64 @@ def build_manifest(root: str | Path, *, strict: bool = True) -> dict[str, Any]:
         "upstream_statuses_required":["PASS","PASS_WITH_REVIEW"],
     }
     return payload
+
+def verify_manifest_integrity(root: str | Path, manifest: Mapping[str, Any]) -> dict[str, Any]:
+    """Verify the recorded files and chain digest; never infer validity from status labels."""
+    root = Path(root).resolve()
+    issues: list[str] = []
+
+    def verify_recorded_file(label: str, rel_path: Any, expected_hash: Any) -> None:
+        if not isinstance(rel_path, str) or not rel_path:
+            issues.append(f"{label}:missing_path")
+            return
+        candidate = (root / rel_path).resolve()
+        try:
+            candidate.relative_to(root)
+        except ValueError:
+            issues.append(f"{label}:path_outside_root")
+            return
+        if not candidate.is_file():
+            issues.append(f"{label}:file_missing")
+            return
+        if not isinstance(expected_hash, str) or len(expected_hash) != 64:
+            issues.append(f"{label}:invalid_expected_sha256")
+            return
+        actual = sha256_file(candidate)
+        if actual.lower() != expected_hash.lower():
+            issues.append(f"{label}:sha256_mismatch")
+
+    artifacts = manifest.get("artifacts")
+    if not isinstance(artifacts, Mapping) or not artifacts:
+        issues.append("artifacts:missing_or_invalid")
+    else:
+        for key, record in artifacts.items():
+            if not isinstance(record, Mapping):
+                issues.append(f"artifact:{key}:invalid_record")
+                continue
+            verify_recorded_file(f"artifact:{key}", record.get("path"), record.get("sha256"))
+
+    source_hashes = manifest.get("source_hashes")
+    if not isinstance(source_hashes, Mapping) or not source_hashes:
+        issues.append("source_hashes:missing_or_invalid")
+    else:
+        for rel_path, expected_hash in source_hashes.items():
+            verify_recorded_file(f"source:{rel_path}", rel_path, expected_hash)
+
+    expected_chain = manifest.get("chain_sha256")
+    if not isinstance(expected_chain, str) or len(expected_chain) != 64:
+        issues.append("chain_sha256:missing_or_invalid")
+    else:
+        # build_manifest computes the chain before appending these two metadata fields.
+        chain_payload = dict(manifest)
+        chain_payload.pop("chain_sha256", None)
+        chain_payload.pop("scientific_evidence_level_maximum", None)
+        chain_payload.pop("reproducibility_policy", None)
+        actual_chain = sha256_bytes(canonical_json(chain_payload))
+        if actual_chain.lower() != expected_chain.lower():
+            issues.append("chain_sha256:mismatch")
+
+    return {
+        "valid": not issues,
+        "status": "PASS" if not issues else "BLOCKED",
+        "issues": issues,
+    }
