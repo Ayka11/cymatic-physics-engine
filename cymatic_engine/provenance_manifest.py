@@ -5,7 +5,7 @@ pipeline. It never fabricates missing upstream artifacts: absent required
 artifacts make the manifest BLOCKED.
 """
 from __future__ import annotations
-import hashlib, json, platform, sys
+import hashlib, json, platform, re, sys
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -40,10 +40,13 @@ def build_manifest(root: str | Path, *, strict: bool = True) -> dict[str, Any]:
     for name, rel in REQUIRED_ARTIFACTS.items():
         p=root/rel
         if not p.is_file(): missing.append(rel); continue
-        try: data=load_json(p)
+        try:
+            data = load_json(p)
         except Exception as e:
-            return {"schema":SCHEMA,"status":"BLOCKED","reason":"invalid_json_artifact","artifact":rel,"error":str(e)}
-        artifacts[name]={"path":rel,"sha256":sha256_file(p),"status":data.get("status"),"schema":data.get("schema")}
+            return {"schema": SCHEMA, "status": "BLOCKED", "reason": "invalid_json_artifact", "artifact": rel, "error": str(e)}
+        if not isinstance(data, Mapping):
+            return {"schema": SCHEMA, "status": "BLOCKED", "reason": "json_root_not_object", "artifact": rel}
+        artifacts[name] = {"path": rel, "sha256": sha256_file(p), "status": data.get("status"), "schema": data.get("schema")}
 
     # Capture the exact configuration and source files that define the gates.
     tracked=[]
@@ -98,7 +101,7 @@ def verify_manifest_integrity(root: str | Path, manifest: Mapping[str, Any]) -> 
         if not candidate.is_file():
             issues.append(f"{label}:file_missing")
             return
-        if not isinstance(expected_hash, str) or len(expected_hash) != 64:
+        if not isinstance(expected_hash, str) or re.fullmatch(r"[0-9a-fA-F]{64}", expected_hash) is None:
             issues.append(f"{label}:invalid_expected_sha256")
             return
         actual = sha256_file(candidate)
@@ -124,16 +127,36 @@ def verify_manifest_integrity(root: str | Path, manifest: Mapping[str, Any]) -> 
     if not isinstance(artifacts, Mapping) or not artifacts:
         issues.append("artifacts:missing_or_invalid")
     else:
-        for key, record in artifacts.items():
+        for key, rel_path in REQUIRED_ARTIFACTS.items():
+            record = artifacts.get(key)
             if not isinstance(record, Mapping):
-                issues.append(f"artifact:{key}:invalid_record")
+                issues.append(f"artifact:{key}:required_record_missing")
                 continue
+            if record.get("path") != rel_path:
+                issues.append(f"artifact:{key}:required_path_mismatch")
             verify_recorded_file(f"artifact:{key}", record.get("path"), record.get("sha256"))
+        for key, record in artifacts.items():
+            if key not in REQUIRED_ARTIFACTS:
+                if not isinstance(record, Mapping):
+                    issues.append(f"artifact:{key}:invalid_record")
+                    continue
+                verify_recorded_file(f"artifact:{key}", record.get("path"), record.get("sha256"))
 
     source_hashes = manifest.get("source_hashes")
+    expected_sources = {
+        str(p.relative_to(root)).replace("\\\\", "/")
+        for pattern in ("config/*.json", "cymatic_engine/**/*.py")
+        for p in root.glob(pattern)
+        if p.is_file()
+    }
     if not isinstance(source_hashes, Mapping) or not source_hashes:
         issues.append("source_hashes:missing_or_invalid")
     else:
+        recorded_sources = set(source_hashes)
+        for rel_path in sorted(expected_sources - recorded_sources):
+            issues.append(f"source:{rel_path}:record_missing")
+        for rel_path in sorted(recorded_sources - expected_sources):
+            issues.append(f"source:{rel_path}:untracked_or_missing")
         for rel_path, expected_hash in source_hashes.items():
             verify_recorded_file(f"source:{rel_path}", rel_path, expected_hash)
 
