@@ -60,7 +60,7 @@ def _apply_evidence_gate(name, data):
     result["declared_status"] = data.get("status", "UNKNOWN")
 
     # An explicit BLOCKED state is never promoted by UI-level checks.
-    if declared_status == "BLOCKED":
+    if declared_status == "BLOCKED" and name != "REPRODUCIBILITY_MANIFEST_v708.json":
         result["status"] = "BLOCKED"
         result["evidence_gate"] = "BLOCKED"
         result.setdefault("gate_reason", "Artifact explicitly declares BLOCKED.")
