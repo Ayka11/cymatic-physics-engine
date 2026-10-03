@@ -331,7 +331,12 @@ def run_public_demo(wav_path=None, duration_sec=0.10, particle_count=10000, grap
         if test_frequency_hz is None:
             raise ValueError("Select a modal test frequency.")
         wav_path, generated_test = generate_modal_test_wav(test_frequency_hz, duration_sec, tone_amplitude)
-        result = _modal_test_run(test_frequency_hz, duration_sec, particle_count, tone_amplitude)
+        try:
+            result = _modal_test_run(test_frequency_hz, duration_sec, particle_count, tone_amplitude)
+        finally:
+            # The generated preview WAV is not consumed by the analytical modal
+            # path; remove it on success and failure to avoid per-run temp leaks.
+            Path(wav_path).unlink(missing_ok=True)
         status = {
             "experiment_id": "PURE-TONE-MODAL-VALIDATION",
             "scientific_status": "COMPUTED_REDUCED_ORDER_MODAL_TEST",
