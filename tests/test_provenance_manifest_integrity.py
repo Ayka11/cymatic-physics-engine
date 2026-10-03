@@ -10,6 +10,7 @@ from cymatic_engine.provenance_manifest import (
     verify_manifest_integrity,
     REQUIRED_ARTIFACTS,
     build_manifest,
+    main as manifest_main,
 )
 
 
@@ -144,3 +145,21 @@ def test_manifest_builder_fails_closed_on_non_object_artifact_json(tmp_path: Pat
     result = build_manifest(tmp_path)
     assert result["status"] == "BLOCKED"
     assert result["reason"] == "json_root_not_object"
+
+
+
+def test_manifest_cli_writes_verifiable_blocked_manifest_without_promoting_it(tmp_path: Path):
+    for key, rel_path in REQUIRED_ARTIFACTS.items():
+        status = "BLOCKED" if key == "mms_fa_status" else "PASS"
+        _write_json(tmp_path / rel_path, {"status": status, "schema": "sample-v1"})
+    _write_json(tmp_path / "config" / "sample.json", {"enabled": True})
+
+    output = tmp_path / "results" / "fresh_manifest.json"
+    result_code = manifest_main(["--root", str(tmp_path), "--output", str(output)])
+
+    written = json.loads(output.read_text(encoding="utf-8"))
+    assert result_code == 0
+    assert written["status"] == "BLOCKED"
+    assert "mms_fa_not_executed_or_weights_unavailable" in written["failures"]
+    integrity = verify_manifest_integrity(tmp_path, written)
+    assert integrity == {"valid": True, "status": "PASS", "issues": []}
