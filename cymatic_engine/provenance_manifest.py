@@ -205,7 +205,7 @@ def main(argv: list[str] | None = None) -> int:
     manifest = build_manifest(root)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2) + "\\n",
+        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
     integrity = verify_manifest_integrity(root, manifest)
