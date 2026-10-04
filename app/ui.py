@@ -25,12 +25,19 @@ def _json(obj):
 
 
 def _report(status):
+    pure_tone = status.get("input_mode") == "Pure tone / modal validation"
+    grapheme = status.get("grapheme") or (
+        "Not applicable - pure-tone mode" if pure_tone else "Not specified"
+    )
+    phoneme_ipa = status.get("phoneme_ipa") or (
+        "Not applicable - pure-tone mode" if pure_tone else "Not specified"
+    )
     lines = [
         "# Cymatic Physics Engine — Public Experiment Report",
         "",
         "## 1. Language / alphabet reference",
-        f"- Grapheme / letter label: **{status.get('grapheme', 'not specified')}**",
-        f"- Phoneme (IPA): **{status.get('phoneme_ipa', 'not specified')}**",
+        f"- Grapheme / letter label: **{grapheme}**",
+        f"- Phoneme (IPA): **{phoneme_ipa}**",
         f"- Language / locale: **{status.get('locale', 'not specified')}**",
         f"- Input mode: **{status.get('input_mode', 'not specified')}**",
         "",
@@ -188,7 +195,7 @@ def _run(wav, duration, particles, grapheme, phoneme_ipa, locale, input_mode, te
             spectro_fig = spectrogram_figure(result["audio_profile"])
             stability_fig = stability_figure(result["stability"])
         else:
-            density = result["particle_result"]["density"]
+            density = result["particle_result"].density
             spec_fig = None
             overview_fig = None
             spectro_fig = None

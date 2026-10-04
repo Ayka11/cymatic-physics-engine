@@ -322,3 +322,47 @@ def test_malformed_wav_is_rejected_before_real_audio_pipeline(tmp_path, monkeypa
         run_public_demo(wav_path=str(malformed), duration_sec=0.1, particle_count=64)
 
     assert called is False
+
+
+def test_public_report_pure_tone_uses_not_applicable_labels():
+    report = _report({
+        "experiment_id": "PURE-TONE-REPORT-TEST",
+        "input_mode": "Pure tone / modal validation",
+        "grapheme": "",
+        "phoneme_ipa": "",
+        "locale": "en",
+        "scientific_status": "COMPUTED_REDUCED_ORDER_MODAL_TEST",
+    })
+
+    assert "Grapheme / letter label: **Not applicable - pure-tone mode**" in report
+    assert "Phoneme (IPA): **Not applicable - pure-tone mode**" in report
+    assert "Grapheme / letter label: ****" not in report
+    assert "Phoneme (IPA): ****" not in report
+
+
+def test_public_report_speech_missing_labels_use_not_specified():
+    report = _report({
+        "experiment_id": "SPEECH-REPORT-FALLBACK-TEST",
+        "input_mode": "Real audio / speech",
+        "grapheme": "",
+        "phoneme_ipa": "",
+        "locale": "en",
+        "scientific_status": "COMPUTED_REDUCED_ORDER_MODEL",
+    })
+
+    assert "Grapheme / letter label: **Not specified**" in report
+    assert "Phoneme (IPA): **Not specified**" in report
+
+
+def test_public_report_preserves_supplied_labels_in_pure_tone_mode():
+    report = _report({
+        "experiment_id": "PURE-TONE-LABEL-PRESERVATION-TEST",
+        "input_mode": "Pure tone / modal validation",
+        "grapheme": "A",
+        "phoneme_ipa": "/a/",
+        "locale": "en",
+        "scientific_status": "COMPUTED_REDUCED_ORDER_MODAL_TEST",
+    })
+
+    assert "Grapheme / letter label: **A**" in report
+    assert "Phoneme (IPA): **/a/**" in report
