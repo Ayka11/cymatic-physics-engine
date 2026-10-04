@@ -1,0 +1,93 @@
+{
+  "audit": "HFR09_ASSET_INTEGRITY",
+  "status": "BLOCKED",
+  "issue_count": 8,
+  "blocker_detection_count": 7,
+  "review_count": 1,
+  "unclassified_count": 0,
+  "fail_closed": true,
+  "issues": [
+    {
+      "code": "DUPLICATE_DECLARED_WAV_HASH",
+      "sha256": "dab4e637fd6e047c017f4a8e832e8155cd8abd025c82620d0dce8f51d4c93a12",
+      "paths": [
+        "assets/hfr09/audio/formant_locked/vowel_e.wav",
+        "assets/hfr09/audio/formant_locked/vowel_ɛ.wav"
+      ],
+      "severity": "BLOCKER"
+    },
+    {
+      "code": "DUPLICATE_DECLARED_WAV_HASH",
+      "sha256": "efc85bfde007666829b1b8b793aa99be42f010add01fbbac29dddef2526db9e3",
+      "paths": [
+        "assets/hfr09/audio/letter_M.wav",
+        "assets/hfr09/audio/letter_N.wav"
+      ],
+      "severity": "BLOCKER"
+    },
+    {
+      "code": "DUPLICATE_DECLARED_WAV_HASH",
+      "sha256": "755d1c56d1cd58ba42c6224b0c8b7b552148b0e98d0f6286c0e69c6c1c9e8bc0",
+      "paths": [
+        "assets/hfr09/audio/vowel_e.wav",
+        "assets/hfr09/audio/vowel_ɛ.wav"
+      ],
+      "severity": "BLOCKER"
+    },
+    {
+      "code": "DUPLICATE_AUDIO_ACROSS_IPA_LABELS",
+      "sha256": "efc85bfde007666829b1b8b793aa99be42f010add01fbbac29dddef2526db9e3",
+      "rows": [
+        {
+          "ipa": "/ɛm/",
+          "file": "letter_M.wav"
+        },
+        {
+          "ipa": "/ɛn/",
+          "file": "letter_N.wav"
+        }
+      ],
+      "severity": "BLOCKER"
+    },
+    {
+      "code": "DUPLICATE_AUDIO_CONTENT",
+      "sha256": "dab4e637fd6e047c017f4a8e832e8155cd8abd025c82620d0dce8f51d4c93a12",
+      "paths": [
+        "formant_locked/vowel_e.wav",
+        "formant_locked/vowel_ɛ.wav"
+      ],
+      "severity": "BLOCKER"
+    },
+    {
+      "code": "DUPLICATE_AUDIO_CONTENT",
+      "sha256": "efc85bfde007666829b1b8b793aa99be42f010add01fbbac29dddef2526db9e3",
+      "paths": [
+        "letter_M.wav",
+        "letter_N.wav"
+      ],
+      "severity": "BLOCKER"
+    },
+    {
+      "code": "DUPLICATE_AUDIO_CONTENT",
+      "sha256": "755d1c56d1cd58ba42c6224b0c8b7b552148b0e98d0f6286c0e69c6c1c9e8bc0",
+      "paths": [
+        "vowel_e.wav",
+        "vowel_ɛ.wav"
+      ],
+      "severity": "BLOCKER"
+    },
+    {
+      "code": "DUPLICATE_VOWEL_FORMANT_TARGETS",
+      "targets_F1_F2_F3_Hz": [
+        530.0,
+        1840.0,
+        2480.0
+      ],
+      "labels": [
+        "e",
+        "ɛ"
+      ],
+      "severity": "REVIEW"
+    }
+  ]
+}
