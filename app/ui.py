@@ -92,16 +92,19 @@ def _zerogpu_probe():
 
 
 def _csv_safe(value):
-    # Prevent spreadsheet formula execution for untrusted string fields while
-    # leaving numeric values (including negative measurements) numeric.
+    """Prevent spreadsheet formula execution for untrusted string fields."""
     if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@")):
         return "'" + value
     return value
 
 
 def _csv_value(value):
+    """Convert structured values to deterministic CSV-safe representations."""
     if isinstance(value, (dict, list, tuple)):
-        return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+        return json.dumps(
+            value, ensure_ascii=False, sort_keys=True,
+            separators=(",", ":"), default=str
+        )
     if value is None:
         return ""
     if isinstance(value, bool):
@@ -113,7 +116,10 @@ def _csv_bytes(status):
     """Export every status field, recursively preserving nested provenance and metrics."""
     output = io.StringIO(newline="")
     writer = csv.writer(output)
-    writer.writerow(["experiment_id", "grapheme", "phoneme_ipa", "record_group", "field", "value"])
+    writer.writerow([
+        "experiment_id", "grapheme", "phoneme_ipa",
+        "record_group", "field", "value"
+    ])
     identity = [
         status.get("experiment_id", ""),
         status.get("grapheme", ""),
@@ -141,8 +147,6 @@ def _csv_bytes(status):
         else:
             emit(group, prefix or "_value", value)
 
-    # Keep identity/status/provenance scalars and recursively export every
-    # structured field, including future fields not known to this UI version.
     for key, value in status.items():
         if isinstance(value, dict):
             flatten(key, value)
@@ -150,7 +154,10 @@ def _csv_bytes(status):
             emit(key, "_value", value)
         else:
             emit("experiment_metadata", key, value)
+
     return output.getvalue().encode("utf-8")
+
+
 
 def _generate_tone(frequency_label, duration, amplitude):
     try:
