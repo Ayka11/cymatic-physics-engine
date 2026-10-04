@@ -9,6 +9,7 @@ import gradio as gr
 import spaces
 
 from .adapter import run_public_demo, REFERENCE_MODAL_TESTS_HZ, generate_modal_test_wav
+from cymatic_engine.audio.profile import read_wav
 from .state import PUBLIC_LIMITS
 from .workbench import build_research_workbench
 from .visualization import (
@@ -163,9 +164,19 @@ def _generate_tone(frequency_label, duration, amplitude):
     try:
         frequency = REFERENCE_MODAL_TESTS_HZ[frequency_label]
         path, meta = generate_modal_test_wav(frequency, float(duration), float(amplitude))
-        return path, _json(meta)
+        # Populate both audio components: the dedicated preview and the actual
+        # experiment input. Also render the generated WAV immediately so the
+        # Acoustic signal tab is not left blank after tone generation.
+        profile = read_wav(path)
+        return (
+            path,
+            path,
+            _json({"status": "GENERATED", **meta}),
+            audio_overview(profile),
+            spectrogram_figure(profile),
+        )
     except Exception as e:
-        return None, _json({"status": "FAILED", "error": str(e)})
+        return None, None, _json({"status": "FAILED", "error": str(e)}), None, None
 
 
 def _run(wav, duration, particles, grapheme, phoneme_ipa, locale, input_mode, test_frequency_label, tone_amplitude, physical_image, actuator, support_condition, excitation_level, camera_notes, particle_material, repeat_id):
@@ -206,6 +217,19 @@ def _run(wav, duration, particles, grapheme, phoneme_ipa, locale, input_mode, te
             spec_fig = None
             overview_fig = None
             spectro_fig = None
+            # Pure-tone modal validation computes the analytical plate mode,
+            # but the supplied/generated WAV still has a real digital waveform.
+            # Keep that signal visible in the acoustic tab instead of clearing it.
+            if wav:
+                try:
+                    tone_profile = read_wav(wav)
+                    overview_fig = audio_overview(tone_profile)
+                    spectro_fig = spectrogram_figure(tone_profile)
+                    spec_fig = spectrum_figure(tone_profile)
+                except Exception:
+                    # Do not fail the modal computation just because an optional
+                    # acoustic preview cannot be rendered from a non-reference WAV.
+                    pass
             stability_fig = stability_figure(result["stability"]) if "stability" in result else None
 
         pattern_fig = density_figure(density, "Cymatic pattern — raw density + deterministic geometry")
@@ -442,7 +466,7 @@ Use this section to prepare a **real physical plate experiment** and keep the ph
         generate_tone.click(
             _generate_tone,
             inputs=[test_frequency, duration, tone_amplitude],
-            outputs=[tone_preview, tone_info],
+            outputs=[tone_preview, wav, tone_info, acoustic_overview, spectrogram],
         )
         run.click(
             _run,
