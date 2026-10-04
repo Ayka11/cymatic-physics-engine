@@ -4,8 +4,10 @@ import json
 from pathlib import Path
 
 from cymatic_engine.hfr09_integrity import (
+    audit_audio_tree,
     audit_integration_manifest,
     audit_letter_audio_manifest,
+    audit_vowel_formant_targets,
 )
 
 
@@ -152,3 +154,103 @@ def test_flags_duplicate_declared_hash_when_one_wav_is_missing(tmp_path):
 
     assert "MISSING_ASSET" in codes
     assert "DUPLICATE_DECLARED_WAV_HASH" in codes
+
+
+
+def test_audio_tree_detects_identical_wav_content(tmp_path):
+    audio = tmp_path / "audio"
+    audio.mkdir(parents=True)
+
+    (audio / "first.wav").write_bytes(b"identical-audio")
+    (audio / "second.wav").write_bytes(b"identical-audio")
+
+    issues = audit_audio_tree(audio)
+
+    duplicates = [
+        issue for issue in issues
+        if issue["code"] == "DUPLICATE_AUDIO_CONTENT"
+    ]
+    assert len(duplicates) == 1
+
+
+def test_audio_tree_accepts_unique_wav_content(tmp_path):
+    audio = tmp_path / "audio"
+    audio.mkdir(parents=True)
+
+    (audio / "first.wav").write_bytes(b"audio-one")
+    (audio / "second.wav").write_bytes(b"audio-two")
+
+    assert audit_audio_tree(audio) == []
+
+
+def test_formant_audit_detects_duplicate_vowel_targets(tmp_path):
+    csv_path = tmp_path / "formants.csv"
+    csv_path.write_text(
+        "sound,type,target_F1_Hz,target_F2_Hz,target_F3_Hz\n"
+        "e,vowel,530,1840,2480\n"
+        "ɛ,vowel,530,1840,2480\n",
+        encoding="utf-8",
+    )
+
+    issues = audit_vowel_formant_targets(csv_path)
+
+    duplicates = [
+        issue for issue in issues
+        if issue["code"] == "DUPLICATE_VOWEL_FORMANT_TARGETS"
+    ]
+    assert len(duplicates) == 1
+    assert duplicates[0]["labels"] == ["e", "ɛ"]
+
+
+def test_audio_tree_paths_are_relative_to_audio_root(tmp_path):
+    audio = tmp_path / "custom" / "audio"
+    audio.mkdir(parents=True)
+
+    (audio / "first.wav").write_bytes(b"same")
+    (audio / "second.wav").write_bytes(b"same")
+
+    issues = audit_audio_tree(audio)
+
+    duplicate = next(
+        issue for issue in issues
+        if issue["code"] == "DUPLICATE_AUDIO_CONTENT"
+    )
+
+    assert duplicate["paths"] == ["first.wav", "second.wav"]
+
+
+def test_formant_audit_rejects_non_finite_and_non_positive_values(
+    tmp_path,
+):
+    csv_path = tmp_path / "formants.csv"
+    csv_path.write_text(
+        "sound,type,target_F1_Hz,target_F2_Hz,target_F3_Hz\n"
+        "e,vowel,NaN,1840,2480\n"
+        "i,vowel,300,inf,2500\n"
+        "u,vowel,0,900,2200\n"
+        ",vowel,400,1500,2500\n",
+        encoding="utf-8",
+    )
+
+    issues = audit_vowel_formant_targets(csv_path)
+
+    invalid = [
+        issue for issue in issues
+        if issue["code"] == "INVALID_FORMANT_TARGET"
+    ]
+
+    assert len(invalid) == 4
+
+
+def test_formant_audit_rejects_invalid_csv_schema(tmp_path):
+    csv_path = tmp_path / "formants.csv"
+    csv_path.write_text(
+        "sound,type,target_F1_Hz\n"
+        "e,vowel,530\n",
+        encoding="utf-8",
+    )
+
+    issues = audit_vowel_formant_targets(csv_path)
+
+    assert len(issues) == 1
+    assert issues[0]["code"] == "INVALID_FORMANT_TARGETS_SCHEMA"
