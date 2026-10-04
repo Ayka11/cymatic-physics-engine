@@ -9,6 +9,7 @@ import gradio as gr
 import spaces
 
 from .adapter import run_public_demo, REFERENCE_MODAL_TESTS_HZ, generate_modal_test_wav
+from cymatic_engine.audio.profile import read_wav
 from .state import PUBLIC_LIMITS
 from .workbench import build_research_workbench
 from .visualization import (
@@ -162,10 +163,19 @@ def _csv_bytes(status):
 def _generate_tone(frequency_label, duration, amplitude):
     try:
         frequency = REFERENCE_MODAL_TESTS_HZ[frequency_label]
-        path, meta = generate_modal_test_wav(frequency, float(duration), float(amplitude))
-        return path, _json(meta)
+        path, meta = generate_modal_test_wav(
+            frequency, float(duration), float(amplitude)
+        )
+        profile = read_wav(path)
+        return (
+            path,
+            path,
+            _json({"status": "GENERATED", **meta}),
+            audio_overview(profile),
+            spectrogram_figure(profile),
+        )
     except Exception as e:
-        return None, _json({"status": "FAILED", "error": str(e)})
+        return None, None, _json({"status": "FAILED", "error": str(e)}), None, None
 
 
 def _run(wav, duration, particles, grapheme, phoneme_ipa, locale, input_mode, test_frequency_label, tone_amplitude, physical_image, actuator, support_condition, excitation_level, camera_notes, particle_material, repeat_id):
@@ -442,7 +452,7 @@ Use this section to prepare a **real physical plate experiment** and keep the ph
         generate_tone.click(
             _generate_tone,
             inputs=[test_frequency, duration, tone_amplitude],
-            outputs=[tone_preview, tone_info],
+            outputs=[tone_preview, wav, tone_info, acoustic_overview, spectrogram],
         )
         run.click(
             _run,
