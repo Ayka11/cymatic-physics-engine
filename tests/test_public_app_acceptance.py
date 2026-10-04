@@ -187,13 +187,21 @@ def test_full_public_app_builds_with_registered_event_handlers():
             close()
 
 
-def test_generate_tone_ui_handler_returns_audio_and_metadata():
-    path, metadata_text = _generate_tone("f11 — 53.318 Hz", 0.5, 0.25)
+def test_generate_tone_ui_handler_returns_audio_metadata_and_acoustic_previews():
+    path, experiment_path, metadata_text, overview, spectrogram = _generate_tone(
+        "f11 — 53.318 Hz", 0.5, 0.25
+    )
     try:
         assert path and Path(path).is_file()
+        assert experiment_path == path
+        assert overview is not None
+        assert spectrogram is not None
         metadata = json.loads(metadata_text)
+        assert metadata["status"] == "GENERATED"
         assert metadata["sample_rate_hz"] == 48000
-        assert metadata["frequency_hz"] == pytest.approx(REFERENCE_MODAL_TESTS_HZ["f11 — 53.318 Hz"])
+        assert metadata["frequency_hz"] == pytest.approx(
+            REFERENCE_MODAL_TESTS_HZ["f11 — 53.318 Hz"]
+        )
     finally:
         if path:
             Path(path).unlink(missing_ok=True)
