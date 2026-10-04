@@ -42,4 +42,4 @@ These flags are assertions that must be backed by the named evidence artifacts a
 
 ## Current audit finding
 
-The current `app/workbench.py::_apply_evidence_gate` only defines required flags for REAL_CORPUS_RUN and SCIENTIFIC_VALIDATION. For other named artifacts it returns the input unchanged. Therefore the UI may show implementation labels without an explicit evidence-gate result. This matrix is a specification for closing that gap; it does not claim that the broader gate has already been implemented.
+The current `app/workbench.py::_apply_evidence_gate` defines artifact-specific evidence requirements for REAL_CORPUS_RUN, SCIENTIFIC_VALIDATION, V7_09, DATASET_BUILDER, CANDIDATE_QC, ALIGNMENT_VALIDATOR, MMS_FA, and CORPUS_BALANCE_QC, and applies additional upstream and integrity checks to the reproducibility manifest. The UI gate checks the presence of explicit Boolean evidence flags; this alone does not independently verify that every upstream provenance record or scientific artifact is authentic and valid. Tests cover selected missing-evidence scenarios. Production-path generation and verification of provenance records require separate validation.
