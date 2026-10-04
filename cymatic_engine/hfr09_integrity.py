@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import math
 from collections import defaultdict
 from pathlib import Path
 
@@ -138,6 +139,106 @@ def audit_letter_audio_manifest(
     return issues
 
 
+
+def audit_audio_tree(audio_root: Path) -> list[dict]:
+    """Find exact duplicate WAV content across the complete audio tree."""
+    audio_root = Path(audio_root).resolve()
+
+    if not audio_root.is_dir():
+        return [{
+            "code": "AUDIO_ROOT_NOT_FOUND",
+            "path": str(audio_root),
+        }]
+
+    by_hash = defaultdict(list)
+
+    for path in sorted(audio_root.rglob("*")):
+        if not path.is_file() or path.suffix.lower() != ".wav":
+            continue
+
+        by_hash[sha256_file(path)].append(
+            path.relative_to(audio_root).as_posix()
+        )
+
+    issues = []
+    for digest, paths in by_hash.items():
+        if len(paths) > 1:
+            issues.append({
+                "code": "DUPLICATE_AUDIO_CONTENT",
+                "sha256": digest,
+                "paths": sorted(paths),
+            })
+
+    return issues
+
+
+def audit_vowel_formant_targets(csv_path: Path) -> list[dict]:
+    """Flag identical formant targets assigned to distinct vowel labels."""
+    issues = []
+    by_targets = defaultdict(list)
+
+    with csv_path.open(encoding="utf-8-sig", newline="") as stream:
+        reader = csv.DictReader(stream)
+        required = {
+            "sound", "type",
+            "target_F1_Hz", "target_F2_Hz", "target_F3_Hz",
+        }
+
+        if not reader.fieldnames or not required.issubset(reader.fieldnames):
+            return [{
+                "code": "INVALID_FORMANT_TARGETS_SCHEMA",
+                "columns": reader.fieldnames,
+            }]
+
+        for row in reader:
+            if (row.get("type") or "").strip().lower() != "vowel":
+                continue
+
+            label = (row.get("sound") or "").strip()
+
+            try:
+                targets = tuple(
+                    float(row[key])
+                    for key in (
+                        "target_F1_Hz",
+                        "target_F2_Hz",
+                        "target_F3_Hz",
+                    )
+                )
+            except (TypeError, ValueError):
+                issues.append({
+                    "code": "INVALID_FORMANT_TARGET",
+                    "row": row,
+                })
+                continue
+
+            if (
+                not label
+                or not all(
+                    math.isfinite(value) and value > 0
+                    for value in targets
+                )
+            ):
+                issues.append({
+                    "code": "INVALID_FORMANT_TARGET",
+                    "row": row,
+                })
+                continue
+
+            by_targets[targets].append(label)
+
+    for targets, labels in by_targets.items():
+        unique_labels = sorted(set(labels))
+        if len(unique_labels) > 1:
+            issues.append({
+                "code": "DUPLICATE_VOWEL_FORMANT_TARGETS",
+                "targets_F1_F2_F3_Hz": targets,
+                "labels": unique_labels,
+            })
+
+    return issues
+
+
 def main() -> int:
     # Keep IPA symbols printable in Windows consoles using legacy encodings.
     import sys
@@ -150,20 +251,83 @@ def main() -> int:
     manifest_path = root / "results/HFR09_ATLAS_INTEGRATION_v714.json"
     letter_csv = root / "assets/hfr09/AZ_letter_test_manifest.csv"
     audio_root = root / "assets/hfr09/audio"
+    formant_csv = root / "assets/hfr09/vowel_formant_targets.csv"
 
     issues = []
     issues.extend(audit_integration_manifest(root, manifest_path))
     issues.extend(audit_letter_audio_manifest(audio_root, letter_csv))
+    issues.extend(audit_audio_tree(audio_root))
+    issues.extend(audit_vowel_formant_targets(formant_csv))
+
+    blocker_codes = {
+        "INVALID_ASSETS_MAP",
+        "ASSET_COUNT_MISMATCH",
+        "MISSING_ASSET",
+        "ASSET_HASH_MISMATCH",
+        "DUPLICATE_DECLARED_WAV_HASH",
+        "INVALID_LETTER_CSV_SCHEMA",
+        "INCOMPLETE_LETTER_ROW",
+        "MISSING_LETTER_AUDIO",
+        "DUPLICATE_AUDIO_ACROSS_IPA_LABELS",
+        "DUPLICATE_AUDIO_CONTENT",
+        "INVALID_FORMANT_TARGET",
+        "INVALID_FORMANT_TARGETS_SCHEMA",
+        "AUDIO_ROOT_NOT_FOUND",
+    }
+
+    review_codes = {
+        "DUPLICATE_VOWEL_FORMANT_TARGETS",
+    }
+
+    blockers = [
+        issue for issue in issues
+        if issue["code"] in blocker_codes
+    ]
+    reviews = [
+        issue for issue in issues
+        if issue["code"] in review_codes
+    ]
+    unclassified = [
+        issue for issue in issues
+        if issue["code"] not in blocker_codes | review_codes
+    ]
+
+    # Fail closed: unknown issue codes can never silently produce PASS.
+    blocked = bool(blockers or unclassified)
+
+    classified_issues = []
+    for issue in issues:
+        code = issue["code"]
+        if code in blocker_codes:
+            severity = "BLOCKER"
+        elif code in review_codes:
+            severity = "REVIEW"
+        else:
+            severity = "UNCLASSIFIED"
+
+        classified_issues.append({
+            **issue,
+            "severity": severity,
+        })
+
+    status = (
+        "BLOCKED" if blocked
+        else "REVIEW_REQUIRED" if reviews
+        else "PASS"
+    )
 
     print(json.dumps({
         "audit": "HFR09_ASSET_INTEGRITY",
+        "status": status,
         "issue_count": len(issues),
-        "status": "PASS" if not issues else "BLOCKED",
-        "issues": issues,
+        "blocker_detection_count": len(blockers),
+        "review_count": len(reviews),
+        "unclassified_count": len(unclassified),
         "fail_closed": True,
+        "issues": classified_issues,
     }, ensure_ascii=False, indent=2))
 
-    return 0 if not issues else 1
+    return 1 if blocked else 0
 
 
 if __name__ == "__main__":
