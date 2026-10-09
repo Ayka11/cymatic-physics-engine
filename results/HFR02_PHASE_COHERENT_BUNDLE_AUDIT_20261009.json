@@ -1,0 +1,66 @@
+{
+  "schema": "CPE_HFR02_PHASE_COHERENT_BUNDLE_AUDIT_v1",
+  "status": "BLOCKED",
+  "evidence_level_maximum": "E0",
+  "audit_timestamp_utc": "2026-10-09T07:22:23.593333+00:00",
+  "environment": {
+    "python": "3.13.5",
+    "numpy": "2.3.5",
+    "soundfile": "0.13.1"
+  },
+  "bundle": {
+    "name": "CPE_HFR02_PHASE_COHERENT_REAL_WAV.zip",
+    "sha256": "3780372009fba5642adc7cdb6c8e46601555ce5ac640f588a3b73fcd204bec98",
+    "size_bytes": 403478
+  },
+  "archive_entries": [
+    {
+      "path": "CPE_HFR02_PHASE_COHERENT_ATLAS.png",
+      "size_bytes": 444511,
+      "sha256": "c9af357564ac3d2a0867dd39930ab7e15a6ff46c2d441ec21e629e933ec8ab90"
+    },
+    {
+      "path": "HFR02_METADATA.json",
+      "size_bytes": 590,
+      "sha256": "20c73d7b55057539691fa0a354e466fa9d162852dab8ad375ebb08b4bd3f8bea"
+    }
+  ],
+  "gates": {
+    "metadata_object": "PASS",
+    "canonical_wav_payload": "BLOCKED",
+    "canonical_wav_sha256": "BLOCKED",
+    "canonical_wav_format": "BLOCKED",
+    "source_conversion_reproducibility": "BLOCKED",
+    "alignment_validation": "BLOCKED",
+    "acoustic_to_force_calibration": "BLOCKED",
+    "spatial_physical_field_validation": "BLOCKED"
+  },
+  "failures": [
+    "canonical_wav_payload_missing"
+  ],
+  "limitations": [
+    "Bundle integrity checks do not validate a physical cymatic effect.",
+    "Audio-domain phase is not calibrated plate phase.",
+    "Acoustic-to-force calibration and spatial physical-field validation are not performed by this tool."
+  ],
+  "metadata_summary": {
+    "experiment": "HFR-02",
+    "declared_status": "REAL_WAV_PHASE_COHERENT_REDUCED_ORDER_EXPERIMENT",
+    "declared_source_sha256": "c319b4abca767b124e41432d364fd7df006cb26bb79d09326c487d606a134e6e",
+    "declared_canonical_wav_file": null,
+    "declared_canonical_wav_sha256": null,
+    "declared_evidence_level": "E1",
+    "declared_phase_preserved": true,
+    "declared_alignment": "manual acoustic candidate nuclei; not forced alignment",
+    "declared_analysis_sample_rate_hz": 48000,
+    "declared_fft": 16384,
+    "declared_frequency_bin_spacing_hz": 2.9296875,
+    "declared_modal_basis": "64x64",
+    "declared_retained_modes": 220,
+    "declared_modal_cutoff_hz": 8000,
+    "declared_spatial_grid": "96x96",
+    "declared_physical_acoustic_to_force_calibration": false,
+    "declared_particle_stage": "not included"
+  },
+  "wav_payloads_found": []
+}
