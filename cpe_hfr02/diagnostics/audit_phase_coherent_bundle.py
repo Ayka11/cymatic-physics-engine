@@ -7,12 +7,12 @@ import json
 import platform
 import re
 import zipfile
+import wave
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
 
 import numpy as np
-import soundfile as sf
 
 SCHEMA = "CPE_HFR02_PHASE_COHERENT_BUNDLE_AUDIT_v1"
 SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
@@ -34,7 +34,6 @@ def audit_bundle(bundle_path: str | Path) -> dict[str, Any]:
         "environment": {
             "python": platform.python_version(),
             "numpy": np.__version__,
-            "soundfile": sf.__version__,
         },
         "bundle": {
             "name": path.name,
@@ -169,36 +168,46 @@ def audit_bundle(bundle_path: str | Path) -> dict[str, Any]:
     report["gates"]["canonical_wav_sha256"] = "PASS"
 
     try:
-        info = sf.info(io.BytesIO(wav_bytes))
-        samples, sample_rate = sf.read(
-            io.BytesIO(wav_bytes), dtype="float64", always_2d=True
-        )
+        with wave.open(io.BytesIO(wav_bytes), "rb") as wav:
+            channels = wav.getnchannels()
+            sample_width = wav.getsampwidth()
+            sample_rate = wav.getframerate()
+            frame_count = wav.getnframes()
+            compression_type = wav.getcomptype()
+            raw_samples = wav.readframes(frame_count)
     except Exception as exc:
         report["failures"].append(f"canonical_wav_decode_failed:{type(exc).__name__}")
         return report
 
+    expected_payload_bytes = frame_count * channels * sample_width
+    payload_length_matches = len(raw_samples) == expected_payload_bytes
+    pcm16 = np.frombuffer(raw_samples, dtype="<i2") if sample_width == 2 else np.array([], dtype=np.int16)
+    non_silent = bool(pcm16.size and np.any(pcm16 != 0))
     format_record = {
         "sample_rate_hz": int(sample_rate),
-        "channels": int(samples.shape[1]),
-        "frames": int(samples.shape[0]),
-        "subtype": info.subtype,
-        "format": info.format,
-        "finite_samples": bool(np.isfinite(samples).all()),
-        "non_silent": bool(samples.size and np.max(np.abs(samples)) > 0.0),
+        "channels": int(channels),
+        "frames": int(frame_count),
+        "sample_width_bytes": int(sample_width),
+        "compression_type": compression_type,
+        "expected_payload_bytes": int(expected_payload_bytes),
+        "actual_payload_bytes": int(len(raw_samples)),
+        "payload_length_matches": bool(payload_length_matches),
+        "finite_samples": bool(sample_width == 2 and payload_length_matches),
+        "non_silent": non_silent,
     }
     report["canonical_wav_format"] = format_record
     if sample_rate != EXPECTED_SAMPLE_RATE_HZ:
         report["failures"].append("canonical_wav_sample_rate_mismatch")
-    if samples.shape[1] != 1:
+    if channels != 1:
         report["failures"].append("canonical_wav_not_mono")
-    if info.subtype != "PCM_16":
+    if sample_width != 2 or compression_type != "NONE":
         report["failures"].append("canonical_wav_not_pcm16")
-    if samples.shape[0] < MIN_SAMPLE_COUNT:
+    if frame_count < MIN_SAMPLE_COUNT:
         report["failures"].append("canonical_wav_too_short")
-    if not np.isfinite(samples).all():
-        report["failures"].append("canonical_wav_non_finite_samples")
-    if not samples.size or np.max(np.abs(samples)) == 0.0:
-        report["failures"].append("canonical_wav_silent")
+    if not payload_length_matches:
+        report["failures"].append("canonical_wav_truncated_pcm_payload")
+    if not non_silent:
+        report["failures"].append("canonical_wav_silent_or_not_pcm16")
 
     if report["failures"]:
         return report

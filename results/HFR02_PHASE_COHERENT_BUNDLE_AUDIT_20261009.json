@@ -2,11 +2,10 @@
   "schema": "CPE_HFR02_PHASE_COHERENT_BUNDLE_AUDIT_v1",
   "status": "BLOCKED",
   "evidence_level_maximum": "E0",
-  "audit_timestamp_utc": "2026-10-09T07:22:23.593333+00:00",
+  "audit_timestamp_utc": "2026-10-09T07:25:36.137292+00:00",
   "environment": {
     "python": "3.13.5",
-    "numpy": "2.3.5",
-    "soundfile": "0.13.1"
+    "numpy": "2.3.5"
   },
   "bundle": {
     "name": "CPE_HFR02_PHASE_COHERENT_REAL_WAV.zip",
