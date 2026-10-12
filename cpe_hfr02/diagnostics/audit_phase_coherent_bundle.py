@@ -46,6 +46,7 @@ def audit_bundle(bundle_path: str | Path) -> dict[str, Any]:
             "canonical_wav_payload": "BLOCKED",
             "canonical_wav_sha256": "BLOCKED",
             "canonical_wav_format": "BLOCKED",
+            "source_payload_identity": "BLOCKED",
             "source_conversion_reproducibility": "BLOCKED",
             "alignment_validation": "BLOCKED",
             "acoustic_to_force_calibration": "BLOCKED",
@@ -55,6 +56,7 @@ def audit_bundle(bundle_path: str | Path) -> dict[str, Any]:
         "limitations": [
             "Bundle integrity checks do not validate a physical cymatic effect.",
             "Audio-domain phase is not calibrated plate phase.",
+            "Source payload identity is distinct from source-to-WAV conversion reproducibility; this audit does not replay the conversion.",
             "Acoustic-to-force calibration and spatial physical-field validation are not performed by this tool.",
         ],
     }
@@ -214,20 +216,23 @@ def audit_bundle(bundle_path: str | Path) -> dict[str, Any]:
 
     report["gates"]["canonical_wav_format"] = "PASS"
     report["status"] = "AUDIO_PAYLOAD_VERIFIED_E0"
+    # A matching source hash binds identity only; it does not replay conversion.
     source_file = metadata.get("source_file")
     source_hash = metadata.get("source_sha256")
-    source_reproducible = (
-        isinstance(source_file, str)
-        and source_file in member_bytes
-        and isinstance(source_hash, str)
-        and SHA256_RE.fullmatch(source_hash) is not None
-        and sha256_bytes(member_bytes[source_file]).lower() == source_hash.lower()
-    )
-    report["gates"]["source_conversion_reproducibility"] = (
-        "PASS" if source_reproducible else "BLOCKED"
-    )
-    if not source_reproducible:
-        report["failures"].append("source_payload_not_verified_for_conversion_reproduction")
+    if not isinstance(source_file, str) or not source_file.strip():
+        report["failures"].append("source_payload_reference_missing")
+    elif source_file not in member_bytes:
+        report["failures"].append("source_payload_missing")
+    elif not isinstance(source_hash, str) or SHA256_RE.fullmatch(source_hash) is None:
+        report["failures"].append("source_payload_sha256_missing_or_invalid")
+    elif sha256_bytes(member_bytes[source_file]).lower() != source_hash.lower():
+        report["failures"].append("source_payload_sha256_mismatch")
+    else:
+        report["gates"]["source_payload_identity"] = "PASS"
+
+    # Never promote conversion reproducibility without replaying the converter
+    # and comparing the resulting canonical WAV bytes/hash.
+    report["gates"]["source_conversion_reproducibility"] = "BLOCKED"
     return report
 
 
@@ -244,7 +249,12 @@ def main(argv: list[str] | None = None) -> int:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(rendered, encoding="utf-8")
     print(rendered, end="")
-    return 0 if report["status"] == "AUDIO_PAYLOAD_VERIFIED_E0" else 2
+    return 0 if (
+        report["status"] == "AUDIO_PAYLOAD_VERIFIED_E0"
+        and not report["failures"]
+        and report["gates"].get("source_payload_identity") == "PASS"
+        and report["gates"].get("source_conversion_reproducibility") == "PASS"
+    ) else 2
 
 
 if __name__ == "__main__":

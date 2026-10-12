@@ -74,6 +74,7 @@ class PhaseCoherentBundleAuditTests(unittest.TestCase):
             self.assertEqual(result["gates"]["canonical_wav_payload"], "PASS")
             self.assertEqual(result["gates"]["canonical_wav_sha256"], "PASS")
             self.assertEqual(result["gates"]["canonical_wav_format"], "PASS")
+            self.assertEqual(result["gates"]["source_payload_identity"], "BLOCKED")
             self.assertEqual(result["gates"]["source_conversion_reproducibility"], "BLOCKED")
             self.assertEqual(result["evidence_level_maximum"], "E0")
             self.assertEqual(result["gates"]["acoustic_to_force_calibration"], "BLOCKED")
@@ -106,6 +107,132 @@ class PhaseCoherentBundleAuditTests(unittest.TestCase):
             self.assertEqual(result["status"], "BLOCKED")
             self.assertIn("canonical_wav_sample_rate_mismatch", result["failures"])
             self.assertIn("canonical_wav_not_mono", result["failures"])
+
+
+    def test_source_hash_match_does_not_claim_conversion_reproducibility(self):
+        with tempfile.TemporaryDirectory() as temp:
+            wav = _wav_bytes()
+            source_bytes = b"test-source-bytes-not-an-experimental-recording"
+            metadata = {
+                "experiment": "HFR-02",
+                "source_file": "source.ogg",
+                "source_sha256": hashlib.sha256(source_bytes).hexdigest(),
+                "canonical_wav_file": "canonical_48k_mono.wav",
+                "canonical_wav_sha256": hashlib.sha256(wav).hexdigest(),
+                "evidence_level": "E1",
+                "phase_preserved": True,
+            }
+            bundle = Path(temp) / "source_and_wav_bundle.zip"
+            with zipfile.ZipFile(bundle, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+                archive.writestr("HFR02_METADATA.json", json.dumps(metadata))
+                archive.writestr("source.ogg", source_bytes)
+                archive.writestr("canonical_48k_mono.wav", wav)
+            result = audit_bundle(bundle)
+            self.assertEqual(result["status"], "AUDIO_PAYLOAD_VERIFIED_E0")
+            self.assertEqual(result["gates"]["source_payload_identity"], "PASS")
+            self.assertEqual(result["gates"]["source_conversion_reproducibility"], "BLOCKED")
+            self.assertEqual(result["evidence_level_maximum"], "E0")
+
+    def test_source_hash_mismatch_does_not_pass_source_identity_gate(self):
+        with tempfile.TemporaryDirectory() as temp:
+            wav = _wav_bytes()
+            source_bytes = b"test-source-bytes-not-an-experimental-recording"
+            metadata = {
+                "experiment": "HFR-02",
+                "source_file": "source.ogg",
+                "source_sha256": "0" * 64,
+                "canonical_wav_file": "canonical_48k_mono.wav",
+                "canonical_wav_sha256": hashlib.sha256(wav).hexdigest(),
+            }
+            bundle = Path(temp) / "source_hash_mismatch.zip"
+            with zipfile.ZipFile(bundle, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+                archive.writestr("HFR02_METADATA.json", json.dumps(metadata))
+                archive.writestr("source.ogg", source_bytes)
+                archive.writestr("canonical_48k_mono.wav", wav)
+            result = audit_bundle(bundle)
+            self.assertEqual(result["status"], "AUDIO_PAYLOAD_VERIFIED_E0")
+            self.assertEqual(result["gates"]["source_payload_identity"], "BLOCKED")
+            self.assertIn("source_payload_sha256_mismatch", result["failures"])
+            self.assertEqual(result["gates"]["source_conversion_reproducibility"], "BLOCKED")
+
+    def test_missing_source_reference_keeps_identity_and_conversion_blocked(self):
+        with tempfile.TemporaryDirectory() as temp:
+            wav = _wav_bytes()
+            metadata = {
+                "experiment": "HFR-02",
+                "canonical_wav_file": "canonical_48k_mono.wav",
+                "canonical_wav_sha256": hashlib.sha256(wav).hexdigest(),
+            }
+            bundle = Path(temp) / "missing_source_reference.zip"
+            _write_bundle(bundle, wav=wav, metadata=metadata)
+            result = audit_bundle(bundle)
+            self.assertEqual(result["gates"]["canonical_wav_payload"], "PASS")
+            self.assertEqual(result["gates"]["source_payload_identity"], "BLOCKED")
+            self.assertEqual(result["gates"]["source_conversion_reproducibility"], "BLOCKED")
+            self.assertIn("source_payload_reference_missing", result["failures"])
+            self.assertEqual(result["evidence_level_maximum"], "E0")
+
+    def test_missing_source_payload_keeps_identity_blocked(self):
+        with tempfile.TemporaryDirectory() as temp:
+            wav = _wav_bytes()
+            metadata = {
+                "experiment": "HFR-02",
+                "source_file": "source.ogg",
+                "source_sha256": "a" * 64,
+                "canonical_wav_file": "canonical_48k_mono.wav",
+                "canonical_wav_sha256": hashlib.sha256(wav).hexdigest(),
+            }
+            bundle = Path(temp) / "missing_source_payload.zip"
+            _write_bundle(bundle, wav=wav, metadata=metadata)
+            result = audit_bundle(bundle)
+            self.assertEqual(result["gates"]["source_payload_identity"], "BLOCKED")
+            self.assertEqual(result["gates"]["source_conversion_reproducibility"], "BLOCKED")
+            self.assertIn("source_payload_missing", result["failures"])
+            self.assertEqual(result["evidence_level_maximum"], "E0")
+
+    def test_invalid_source_sha256_keeps_identity_blocked(self):
+        with tempfile.TemporaryDirectory() as temp:
+            wav = _wav_bytes()
+            source_bytes = b"opaque-test-source-bytes-not-experimental-audio"
+            metadata = {
+                "experiment": "HFR-02",
+                "source_file": "source.ogg",
+                "source_sha256": "z" * 64,
+                "canonical_wav_file": "canonical_48k_mono.wav",
+                "canonical_wav_sha256": hashlib.sha256(wav).hexdigest(),
+            }
+            bundle = Path(temp) / "invalid_source_sha256.zip"
+            _write_bundle(bundle, wav=wav, metadata=metadata)
+            with zipfile.ZipFile(bundle, "a", compression=zipfile.ZIP_DEFLATED) as archive:
+                archive.writestr("source.ogg", source_bytes)
+            result = audit_bundle(bundle)
+            self.assertEqual(result["gates"]["source_payload_identity"], "BLOCKED")
+            self.assertEqual(result["gates"]["source_conversion_reproducibility"], "BLOCKED")
+            self.assertIn("source_payload_sha256_missing_or_invalid", result["failures"])
+            self.assertEqual(result["evidence_level_maximum"], "E0")
+
+    def test_cli_exit_code_is_nonzero_until_conversion_is_reproduced(self):
+        from contextlib import redirect_stdout
+        from cpe_hfr02.diagnostics.audit_phase_coherent_bundle import main
+
+        with tempfile.TemporaryDirectory() as temp:
+            wav = _wav_bytes()
+            source_bytes = b"test-source-bytes-not-an-experimental-recording"
+            metadata = {
+                "experiment": "HFR-02",
+                "source_file": "source.ogg",
+                "source_sha256": hashlib.sha256(source_bytes).hexdigest(),
+                "canonical_wav_file": "canonical_48k_mono.wav",
+                "canonical_wav_sha256": hashlib.sha256(wav).hexdigest(),
+            }
+            bundle = Path(temp) / "valid_audio_but_unreplayed_conversion.zip"
+            with zipfile.ZipFile(bundle, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+                archive.writestr("HFR02_METADATA.json", json.dumps(metadata))
+                archive.writestr("source.ogg", source_bytes)
+                archive.writestr("canonical_48k_mono.wav", wav)
+            with redirect_stdout(io.StringIO()):
+                exit_code = main([str(bundle)])
+            self.assertEqual(exit_code, 2)
 
 
 if __name__ == "__main__":
